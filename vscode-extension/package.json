@@ -1,0 +1,48 @@
+{
+  "name": "projectmind-tracker",
+  "displayName": "ProjectMind Tracker",
+  "description": "Tracks your coding activity for ProjectMind AI copilot",
+  "version": "0.0.1",
+  "engines": { "vscode": "^1.85.0" },
+  "activationEvents": ["onStartupFinished"],
+  "main": "./extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "ProjectMind",
+      "properties": {
+        "projectmind.apiUrl": {
+          "type": "string",
+          "default": "http://localhost:4000",
+          "description": "ProjectMind backend URL"
+        },
+        "projectmind.projectId": {
+          "type": "string",
+          "default": "",
+          "description": "Your active project ID from ProjectMind"
+        },
+        "projectmind.token": {
+          "type": "string",
+          "default": "",
+          "description": "Your JWT token from ProjectMind login"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "projectmind.setProject",
+        "title": "ProjectMind: Set Active Project"
+      },
+      {
+        "command": "projectmind.setToken",
+        "title": "ProjectMind: Set Auth Token"
+      },
+      {
+        "command": "projectmind.status",
+        "title": "ProjectMind: Show Status"
+      }
+    ]
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^2.22.0"
+  }
+}
