@@ -5,6 +5,8 @@ import {
   Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import api from '../api/client';
+import CopilotChat from '../components/CopilotChat';
+
 
 export default function Dashboard() {
   const { id }   = useParams();
@@ -227,6 +229,9 @@ export default function Dashboard() {
         </div>
 
         {/* Task list */}
+        <div className="mt-6">
+  <CopilotChat projectId={id} />
+            </div>
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
           {tasks.length === 0 ? (
             <div className="p-8 text-center text-gray-400 text-sm">
