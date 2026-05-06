@@ -17,9 +17,71 @@ exports.createProject = async (req, res) => {
       deadline,
       hoursPerDay,
     });
+    
     console.log('Calling AI for task breakdown...');
-    const { tasks, mapping } = await breakdownProject({ name, goal, deadline, hoursPerDay });
-    console.log('AI returned ' + tasks.length + ' tasks');
+    
+    let tasks, mapping;
+    try {
+      const result = await breakdownProject({ name, goal, deadline, hoursPerDay });
+      tasks = result.tasks;
+      mapping = result.mapping || {};
+      console.log('AI returned ' + tasks.length + ' tasks');
+    } catch (aiError) {
+      console.error('AI breakdown failed:', aiError.message);
+      console.log('Using fallback task generation...');
+      
+      // Fallback: Create basic tasks manually
+      const daysLeft = Math.ceil(
+        (new Date(deadline) - new Date()) / (1000 * 60 * 60 * 24)
+      );
+      
+      const tasksPerPhase = Math.ceil(daysLeft / 3);
+      
+      tasks = [
+        { 
+          id: 't1', 
+          day: 1, 
+          title: 'Project setup and planning', 
+          estimatedH: hoursPerDay, 
+          priority: 'high', 
+          dependencies: [] 
+        },
+        { 
+          id: 't2', 
+          day: tasksPerPhase, 
+          title: 'Core implementation - Phase 1', 
+          estimatedH: hoursPerDay, 
+          priority: 'high', 
+          dependencies: [] 
+        },
+        { 
+          id: 't3', 
+          day: tasksPerPhase * 2, 
+          title: 'Core implementation - Phase 2', 
+          estimatedH: hoursPerDay, 
+          priority: 'high', 
+          dependencies: [] 
+        },
+        { 
+          id: 't4', 
+          day: Math.max(daysLeft - 1, tasksPerPhase * 2 + 1), 
+          title: 'Testing and bug fixes', 
+          estimatedH: hoursPerDay, 
+          priority: 'medium', 
+          dependencies: [] 
+        },
+        { 
+          id: 't5', 
+          day: daysLeft, 
+          title: 'Final review and deployment', 
+          estimatedH: hoursPerDay, 
+          priority: 'medium', 
+          dependencies: [] 
+        },
+      ];
+      mapping = {};
+    }
+    
     const idMap = {};
     const savedTasks = [];
     for (const t of tasks) {
@@ -67,6 +129,12 @@ exports.getProject = async (req, res) => {
   try {
     const project = await Project.findById(req.params.id);
     if (!project) return res.status(404).json({ error: 'Project not found' });
+    
+    // Verify ownership
+    if (project.user.toString() !== req.user.userId) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+    
     const tasks = await Task.find({ project: project._id }).sort('day');
     res.json({ project, tasks });
   } catch (err) {
@@ -78,6 +146,12 @@ exports.rescheduleProject = async (req, res) => {
   try {
     const project = await Project.findById(req.params.id);
     if (!project) return res.status(404).json({ error: 'Project not found' });
+    
+    // Verify ownership
+    if (project.user.toString() !== req.user.userId) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+    
     const daysLeft = Math.ceil(
       (new Date(project.deadline) - new Date()) / (1000 * 60 * 60 * 24)
     );
@@ -111,10 +185,17 @@ exports.rescheduleProject = async (req, res) => {
 
 exports.getProgress = async (req, res) => {
   try {
+    const project = await Project.findById(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    
+    // Verify ownership
+    if (project.user.toString() !== req.user.userId) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+    
     const tasks = await Task.find({ project: req.params.id }).sort('day');
     if (!tasks.length) return res.json([]);
     const totalTasks = tasks.length;
-    const project    = await Project.findById(req.params.id);
     const createdAt  = new Date(project.createdAt);
     const today      = new Date();
     const dayNumber  = Math.ceil((today - createdAt) / (1000 * 60 * 60 * 24));

@@ -9,11 +9,19 @@ router.get('/:id', require('../controllers/projectController').getProject);
 router.post('/:id/reschedule', require('../controllers/projectController').rescheduleProject);
 router.get('/:id/progress',    require('../controllers/projectController').getProgress);
 
-module.exports = router;
-
 router.get('/:id/heatmap', async (req, res) => {
   try {
+    const Project = require('../models/Project');
     const ActivityLog = require('../models/ActivityLog');
+    
+    const project = await Project.findById(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    
+    // Verify ownership
+    if (project.user.toString() !== req.user.userId) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+    
     const logs = await ActivityLog.find({
       project: req.params.id
     }).sort('timestamp');
@@ -33,3 +41,5 @@ router.get('/:id/heatmap', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+module.exports = router;

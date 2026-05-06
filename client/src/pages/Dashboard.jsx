@@ -1,11 +1,19 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
 } from 'recharts';
+
 import api from '../api/client';
 import CopilotChat from '../components/CopilotChat';
+import FocusMode from '../components/FocusMode';
 
 export default function Dashboard() {
   const { id } = useParams();
@@ -16,8 +24,8 @@ export default function Dashboard() {
   const [progress, setProgress] = useState([]);
   const [insight, setInsight] = useState('');
   const [loading, setLoading] = useState(true);
-  const [rescheduling, setRescheduling] = useState(false);
   const [activeTab, setActiveTab] = useState('tasks');
+  const [activeFeature, setActiveFeature] = useState(null);
 
   useEffect(() => {
     fetchAll();
@@ -25,16 +33,20 @@ export default function Dashboard() {
 
   const fetchAll = async () => {
     setLoading(true);
+
     try {
       const [projRes, progressRes] = await Promise.all([
         api.get(`/api/projects/${id}`),
         api.get(`/api/projects/${id}/progress`),
       ]);
 
-      setProject(projRes.data.project);
-      setTasks(projRes.data.tasks);
-      setProgress(progressRes.data);
-      generateInsight(projRes.data.project, projRes.data.tasks);
+      const projectData = projRes.data.project;
+      const taskData = projRes.data.tasks || [];
+
+      setProject(projectData);
+      setTasks(taskData);
+      setProgress(progressRes.data || []);
+      generateInsight(projectData, taskData);
     } catch (err) {
       console.error(err);
     } finally {
@@ -43,32 +55,32 @@ export default function Dashboard() {
   };
 
   const generateInsight = (proj, taskList = []) => {
-  if (!proj) return;
+    if (!proj) return;
 
-  const done = taskList.filter(t => t.status === 'done').length;
-  const pct = taskList.length ? Math.round((done / taskList.length) * 100) : 0;
-  const behind = proj.daysBehind || 0;
+    const done = taskList.filter((t) => t.status === 'done').length;
+    const pct = taskList.length
+      ? Math.round((done / taskList.length) * 100)
+      : 0;
 
-  setInsight(
-    `AI Analysis: You are ${pct}% complete. ${
-      behind > 0
-        ? `Delay detected (${behind} days). Prioritize high-impact tasks immediately.`
-        : `You're on track. Maintain consistency to meet your deadline.`
-    }`
-  );
-};
+    const behind = proj.daysBehind || 0;
+
+    setInsight(
+      `AI Analysis: You are ${pct}% complete. ${
+        behind > 0
+          ? `Delay detected (${behind} days). Prioritize high-impact tasks immediately.`
+          : `You're on track. Maintain consistency to meet your deadline.`
+      }`
+    );
+  };
 
   const handleReschedule = async () => {
     if (!window.confirm('Let AI regenerate your remaining schedule?')) return;
 
-    setRescheduling(true);
     try {
       await api.post(`/api/projects/${id}/reschedule`);
       await fetchAll();
     } catch (err) {
       alert('Reschedule failed: ' + (err.response?.data?.error || err.message));
-    } finally {
-      setRescheduling(false);
     }
   };
 
@@ -85,11 +97,20 @@ export default function Dashboard() {
     return '⬜';
   };
 
-  const doneTasks = tasks.filter(t => t.status === 'done').length;
+  const doneTasks = tasks.filter((t) => t.status === 'done').length;
   const totalTasks = tasks.length;
-  const completionPct = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0;
-  const pendingTasks = totalTasks - doneTasks;
-  const riskLevel = project?.daysBehind > 2 ? 'High' : project?.daysBehind > 0 ? 'Medium' : 'Low';
+  const pendingTasks = tasks.filter((t) => t.status !== 'done').length;
+
+  const completionPct = totalTasks
+    ? Math.round((doneTasks / totalTasks) * 100)
+    : 0;
+
+  const riskLevel =
+    project?.daysBehind > 2
+      ? 'High'
+      : project?.daysBehind > 0
+      ? 'Medium'
+      : 'Low';
 
   const filteredTasks = tasks.filter((t) => {
     if (activeTab === 'tasks') {
@@ -98,8 +119,30 @@ export default function Dashboard() {
       const dayNum = Math.ceil((today - createdAt) / (1000 * 60 * 60 * 24));
       return t.day === dayNum || t.day === dayNum + 1;
     }
+
     return true;
   });
+
+  const featureCards = [
+    {
+      id: 'ppt',
+      icon: '📄',
+      title: 'AI Demo / PPT Generator',
+      desc: 'Generate demo summary and presentation content.',
+    },
+    {
+      id: 'focus',
+      icon: '🌙',
+      title: 'Deep Focus Mode',
+      desc: 'Enter distraction-free task execution mode.',
+    },
+    {
+      id: 'meeting',
+      icon: '🤝',
+      title: 'AI Meeting Assistant',
+      desc: 'Manage meetings, absence notes, and summaries.',
+    },
+  ];
 
   if (loading) {
     return (
@@ -127,6 +170,7 @@ export default function Dashboard() {
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center shadow-lg shadow-violet-900/40">
             <span className="text-white font-black">PM</span>
           </div>
+
           <div>
             <p className="font-black text-white text-lg">ProjectMind</p>
             <p className="text-xs text-violet-200/70">AI Copilot</p>
@@ -134,23 +178,19 @@ export default function Dashboard() {
         </div>
 
         <div className="space-y-2">
-          {[
-            ['📊', 'Dashboard', true],
-            ['🧠', 'AI Insights', false],
-            ['📈', 'Progress', false],
-            ['✅', 'Tasks', false],
-            ['⚙️', 'Settings', false],
-          ].map(([icon, label, active]) => (
+          <button className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition bg-gradient-to-r from-violet-500 to-fuchsia-600 text-white shadow-lg shadow-violet-900/30">
+            <span>📊</span>
+            Dashboard
+          </button>
+
+          {featureCards.map((feature) => (
             <button
-              key={label}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition ${
-                active
-                  ? 'bg-gradient-to-r from-violet-500 to-fuchsia-600 text-white shadow-lg shadow-violet-900/30'
-                  : 'text-slate-400 hover:text-white hover:bg-white/5'
-              }`}
+              key={feature.id}
+              onClick={() => setActiveFeature(feature.id)}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10 hover:text-white"
             >
-              <span>{icon}</span>
-              {label}
+              <span>{feature.icon}</span>
+              {feature.title}
             </button>
           ))}
         </div>
@@ -163,6 +203,156 @@ export default function Dashboard() {
         </button>
       </aside>
 
+      {activeFeature && (
+        <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-xl overflow-y-auto">
+          <div className="min-h-screen p-6 lg:p-10">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <p className="text-xs text-violet-300 font-bold uppercase">
+                  ProjectMind Feature
+                </p>
+
+                <h2 className="text-4xl font-black text-white">
+                  {activeFeature === 'ppt' && '📄 AI Demo / PPT Generator'}
+                  {activeFeature === 'focus' && '🌙 Deep Focus Mode'}
+                  {activeFeature === 'meeting' && '🤝 AI Meeting Assistant'}
+                </h2>
+              </div>
+
+              <button
+                onClick={() => setActiveFeature(null)}
+                className="w-12 h-12 rounded-2xl bg-white/10 text-white hover:bg-white/20 transition"
+              >
+                ✕
+              </button>
+            </div>
+
+
+            {activeFeature === 'ppt' && (
+              <div className="glass-card rounded-3xl p-8 max-w-5xl">
+                <p className="text-6xl mb-6">📄</p>
+
+                <h3 className="text-2xl font-black text-white mb-3">
+                  AI Demo / PPT Generator
+                </h3>
+
+                <p className="text-slate-400 mb-6">
+                  Generate a project overview, problem statement, solution,
+                  features, tech stack, future scope, and demo script.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  {[
+                    'Project Overview',
+                    'Problem Statement',
+                    'Implemented Features',
+                    'Tech Stack',
+                    'Future Scope',
+                    'Demo Script',
+                  ].map((item) => (
+                    <div
+                      key={item}
+                      className="bg-white/5 border border-white/10 rounded-2xl p-4 text-slate-300 font-bold"
+                    >
+                      ✅ {item}
+                    </div>
+                  ))}
+                </div>
+
+                <button className="bg-gradient-to-r from-blue-500 to-violet-600 text-white px-8 py-4 rounded-2xl font-bold hover:scale-[1.02] active:scale-95 transition">
+                  Generate Demo Summary
+                </button>
+              </div>
+            )}
+
+            {activeFeature === 'focus' && (
+              <div className="max-w-4xl">
+                <FocusMode
+                  tasks={tasks}
+                  completionPct={completionPct}
+                  riskLevel={riskLevel}
+                  onReschedule={handleReschedule}
+                />
+              </div>
+            )}
+
+            {activeFeature === 'meeting' && (
+              <div className="glass-card rounded-3xl p-8 max-w-5xl">
+                <p className="text-6xl mb-6">🤝</p>
+
+                <h3 className="text-2xl font-black text-white mb-3">
+                  AI Meeting Assistant
+                </h3>
+
+                <p className="text-slate-400 mb-6">
+                  View meeting timings, mark attendance, send absence message,
+                  and receive AI-generated important points from missed meetings.
+                </p>
+
+                <div className="space-y-4">
+                  {[
+                    {
+                      time: '7:00 PM',
+                      title: 'Backend Sync',
+                      agenda: 'API progress, database issues, authentication flow',
+                    },
+                    {
+                      time: '8:30 PM',
+                      title: 'UI Review',
+                      agenda: 'Dashboard polish, chatbot layout, feature cards',
+                    },
+                    {
+                      time: '9:15 PM',
+                      title: 'Demo Planning',
+                      agenda: 'Presentation flow, demo script, final testing',
+                    },
+                  ].map((meeting) => (
+                    <div
+                      key={meeting.title}
+                      className="bg-white/5 border border-white/10 rounded-2xl p-5"
+                    >
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+                        <div>
+                          <p className="text-white font-black text-lg">
+                            {meeting.title}
+                          </p>
+                          <p className="text-xs text-violet-300 font-bold mt-1">
+                            {meeting.time}
+                          </p>
+                          <p className="text-sm text-slate-400 mt-2">
+                            Agenda: {meeting.agenda}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <button className="bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 py-3 rounded-2xl font-bold hover:bg-emerald-500/30 transition">
+                          I Will Attend
+                        </button>
+
+                        <button className="bg-red-500/20 border border-red-400/30 text-red-300 py-3 rounded-2xl font-bold hover:bg-red-500/30 transition">
+                          Can’t Attend
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-6 bg-violet-500/10 border border-violet-400/20 rounded-2xl p-5">
+                  <p className="text-violet-200 font-black mb-2">
+                    AI Missed Meeting Summary
+                  </p>
+                  <p className="text-sm text-slate-300">
+                    If you can’t attend, AI will collect key points, decisions,
+                    blockers, and assigned tasks from the meeting.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <main className="flex-1 px-5 lg:px-8 py-6 max-w-[1500px] mx-auto">
         <nav className="lg:hidden mb-6 flex items-center justify-between">
           <button
@@ -171,7 +361,18 @@ export default function Dashboard() {
           >
             ← Back
           </button>
-          <p className="font-black text-white">ProjectMind</p>
+
+          <div className="flex gap-2">
+            {featureCards.slice(0, 2).map((feature) => (
+              <button
+                key={feature.id}
+                onClick={() => setActiveFeature(feature.id)}
+                className="text-slate-300 hover:text-violet-300 text-sm font-bold bg-white/5 border border-white/10 rounded-xl px-3 py-2"
+              >
+                {feature.icon}
+              </button>
+            ))}
+          </div>
         </nav>
 
         <section className="relative overflow-hidden rounded-[2rem] p-8 mb-6 glass-card">
@@ -187,12 +388,15 @@ export default function Dashboard() {
               <h1 className="text-4xl md:text-6xl font-black tracking-tight text-white">
                 {project.name}
               </h1>
+
               <p className="text-sm text-violet-300 mt-2">
-  {doneTasks} of {totalTasks} tasks completed • {pendingTasks} pending • {project.daysBehind || 0} days behind
-</p>
+                {doneTasks} of {totalTasks} tasks completed • {pendingTasks} pending •{' '}
+                {project.daysBehind || 0} days behind
+              </p>
 
               <p className="text-slate-300 mt-4 max-w-2xl leading-relaxed">
-                AI monitors your productivity, detects schedule risk, and helps you recover when tasks fall behind.
+                AI monitors productivity, predicts schedule risk, recommends action plans,
+                and helps you recover when tasks fall behind.
               </p>
             </div>
 
@@ -203,7 +407,15 @@ export default function Dashboard() {
               </div>
 
               <div className="bg-white/10 border border-white/10 backdrop-blur rounded-3xl px-6 py-5 text-center">
-                <p className={`text-4xl font-black ${riskLevel === 'High' ? 'text-red-300' : riskLevel === 'Medium' ? 'text-yellow-300' : 'text-emerald-300'}`}>
+                <p
+                  className={`text-4xl font-black ${
+                    riskLevel === 'High'
+                      ? 'text-red-300'
+                      : riskLevel === 'Medium'
+                      ? 'text-yellow-300'
+                      : 'text-emerald-300'
+                  }`}
+                >
                   {riskLevel}
                 </p>
                 <p className="text-sm text-slate-300 mt-1">Risk Level</p>
@@ -221,48 +433,57 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div className="xl:col-span-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
-              {[
-                { label: 'Completion', value: `${completionPct}%`, icon: '📈' },
-                { label: 'Done Tasks', value: `${doneTasks} / ${totalTasks}`, icon: '✅' },
-                { label: 'Pending', value: pendingTasks, icon: '🕒' },
-                { label: 'Deadline', value: new Date(project.deadline).toLocaleDateString(), icon: '📅' },
-              ].map(({ label, value, icon }) => (
-                <div
-                  key={label}
-                  className="glass-card glow-card rounded-3xl p-5 hover:-translate-y-1 transition-all duration-300"
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <p className="text-sm text-slate-400">{label}</p>
-                    <span className="text-2xl">{icon}</span>
-                  </div>
-                  <p className="text-3xl font-black text-white">{value}</p>
-                </div>
-              ))}
-            </div>
-
             {progress.length > 0 && (
               <div className="glass-card rounded-3xl p-6 mb-6">
-                <h2 className="font-black text-white text-xl mb-1">Progress Burndown</h2>
-                <p className="text-sm text-slate-400 mb-5">Planned progress vs actual progress</p>
+                <h2 className="font-black text-white text-xl mb-1">
+                  Progress Burndown
+                </h2>
+                <p className="text-sm text-slate-400 mb-5">
+                  Planned progress vs actual progress
+                </p>
 
                 <ResponsiveContainer width="100%" height={280}>
                   <LineChart data={progress}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
-                    <XAxis dataKey="day" tickFormatter={(v) => `Day ${v}`} tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                    <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="rgba(148,163,184,0.18)"
+                    />
+                    <XAxis
+                      dataKey="day"
+                      tickFormatter={(v) => `Day ${v}`}
+                      tick={{ fontSize: 11, fill: '#94a3b8' }}
+                    />
+                    <YAxis
+                      domain={[0, 100]}
+                      tickFormatter={(v) => `${v}%`}
+                      tick={{ fontSize: 11, fill: '#94a3b8' }}
+                    />
                     <Tooltip
                       formatter={(v) => `${v}%`}
                       contentStyle={{
                         background: '#0f172a',
                         border: '1px solid rgba(148,163,184,0.25)',
                         borderRadius: '16px',
-                        color: '#e2e8f0'
+                        color: '#e2e8f0',
                       }}
                     />
                     <Legend />
-                    <Line type="monotone" dataKey="planned" stroke="#8b5cf6" strokeWidth={3} dot={false} name="Planned" />
-                    <Line type="monotone" dataKey="actual" stroke="#22c55e" strokeWidth={3} dot={false} name="Actual" />
+                    <Line
+                      type="monotone"
+                      dataKey="planned"
+                      stroke="#8b5cf6"
+                      strokeWidth={3}
+                      dot={false}
+                      name="Planned"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="actual"
+                      stroke="#22c55e"
+                      strokeWidth={3}
+                      dot={false}
+                      name="Actual"
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -288,9 +509,9 @@ export default function Dashboard() {
               {filteredTasks.length === 0 ? (
                 <div className="p-10 text-center">
                   <p className="text-5xl mb-3">📝</p>
-                 <p className="text-slate-400 text-sm">
-  No tasks yet. AI will generate your schedule based on your goal.
-</p>
+                  <p className="text-slate-400 text-sm">
+                    No tasks yet. AI will generate your schedule based on your goal.
+                  </p>
                 </div>
               ) : (
                 <div className="divide-y divide-white/10">
@@ -302,7 +523,13 @@ export default function Dashboard() {
                       <span className="text-xl">{statusIcon(task.status)}</span>
 
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-bold ${task.status === 'done' ? 'line-through text-slate-500' : 'text-slate-100'}`}>
+                        <p
+                          className={`text-sm font-bold ${
+                            task.status === 'done'
+                              ? 'line-through text-slate-500'
+                              : 'text-slate-100'
+                          }`}
+                        >
                           {task.title}
                         </p>
                         <p className="text-xs text-slate-500 mt-1">
@@ -310,7 +537,11 @@ export default function Dashboard() {
                         </p>
                       </div>
 
-                      <span className={`text-xs px-3 py-1 rounded-full font-bold border ${priorityColor(task.priority)}`}>
+                      <span
+                        className={`text-xs px-3 py-1 rounded-full font-bold border ${priorityColor(
+                          task.priority
+                        )}`}
+                      >
                         {task.priority}
                       </span>
                     </div>
@@ -322,63 +553,14 @@ export default function Dashboard() {
 
           <aside className="space-y-6">
             <div className="glass-card rounded-3xl p-6">
-              <p className="text-xs font-bold text-violet-300 uppercase tracking-wide mb-2">
-                🤖 AI Copilot
-              </p>
-              <h2 className="text-2xl font-black text-white mb-3">Today’s Recommendation</h2>
-              <p className="text-slate-300 text-sm leading-relaxed">
-                {insight}
-              </p>
-
-              <button
-                onClick={handleReschedule}
-                disabled={rescheduling}
-                className="w-full mt-5 bg-gradient-to-r from-violet-500 to-fuchsia-600 text-white py-3 rounded-2xl font-bold hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition shadow-lg shadow-violet-900/40"
-              >
-                {rescheduling ? 'Optimizing Plan...' : 'Optimize Plan with AI'}
-              </button>
-            </div>
-
-            <div className="glass-card rounded-3xl p-6">
-              <h2 className="text-xl font-black text-white mb-4">Project Health</h2>
-
-              <div className="space-y-4">
-                <div>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-slate-400">Consistency</span>
-                    <span className="text-emerald-300 font-bold">{completionPct >= 50 ? 'Good' : 'Needs Focus'}</span>
-                  </div>
-                  <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                    <div className="h-2 bg-emerald-400 rounded-full" style={{ width: `${Math.min(completionPct + 20, 100)}%` }} />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-slate-400">Deadline Risk</span>
-                    <span className="text-violet-300 font-bold">{riskLevel}</span>
-                  </div>
-                  <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                    <div
-                      className="h-2 bg-violet-400 rounded-full"
-                      style={{ width: riskLevel === 'High' ? '85%' : riskLevel === 'Medium' ? '55%' : '25%' }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {project.status === 'delayed' && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-3xl p-6">
-                <p className="text-red-300 font-black mb-2">⚠ Delay Detected</p>
-                <p className="text-red-200/70 text-sm">
-                  You are {project.daysBehind} day{project.daysBehind !== 1 ? 's' : ''} behind schedule.
-                </p>
-              </div>
-            )}
-
-            <div className="glass-card rounded-3xl p-6">
-              <CopilotChat projectId={id} />
+              <CopilotChat
+                projectId={id}
+                project={project}
+                tasks={tasks}
+                progress={progress}
+                insight={insight}
+                onReschedule={handleReschedule}
+              />
             </div>
           </aside>
         </div>
@@ -386,3 +568,4 @@ export default function Dashboard() {
     </div>
   );
 }
+
