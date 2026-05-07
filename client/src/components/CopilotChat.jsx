@@ -7,7 +7,6 @@ export default function CopilotChat({
   tasks = [],
   progress = [],
   insight,
-  onReschedule,
 }) {
   const [messages, setMessages] = useState([
     {
@@ -222,14 +221,12 @@ export default function CopilotChat({
   ];
 
   return (
-    <div className="bg-slate-950/70 border border-white/10 rounded-3xl flex flex-col h-[650px] overflow-hidden shadow-xl shadow-violet-900/20">
+    <div className="bg-slate-950/70 border border-white/10 rounded-3xl flex flex-col h-[650px] overflow-hidden shadow-xl shadow-cyan-900/20">
       <div className="px-6 py-5 border-b border-white/10 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div
-            className={`w-3 h-3 rounded-full ${
-              listening ? 'bg-red-400 animate-ping' : 'bg-emerald-400 animate-pulse'
-            }`}
-          ></div>
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center shadow-lg">
+            <span className="text-lg">🤖</span>
+          </div>
 
           <div>
             <p className="font-black text-white text-lg">AI Copilot</p>
@@ -239,25 +236,25 @@ export default function CopilotChat({
           </div>
         </div>
 
-        <div className="bg-violet-500/10 border border-violet-400/20 px-3 py-2 rounded-2xl">
-          <p className="text-[10px] text-violet-200 uppercase">Productivity</p>
-          <p className="text-sm font-black text-violet-300">
+        <div className="bg-cyan-500/10 border border-cyan-400/20 px-4 py-2 rounded-xl">
+          <p className="text-[10px] text-cyan-200 uppercase font-bold tracking-wide">Productivity</p>
+          <p className="text-lg font-black text-cyan-300">
             {productivityScore}/100
           </p>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
+      <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
         {messages.map((m, i) => (
           <div
             key={i}
             className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-sm px-4 py-3 rounded-3xl text-sm leading-relaxed ${
+              className={`max-w-[85%] px-5 py-3.5 rounded-2xl text-sm leading-relaxed shadow-lg ${
                 m.role === 'user'
-                  ? 'bg-gradient-to-r from-violet-500 to-fuchsia-600 text-white'
-                  : 'bg-white/10 border border-white/10 text-slate-200'
+                  ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white'
+                  : 'bg-slate-900/80 border border-white/10 text-slate-200'
               }`}
             >
               {m.text}
@@ -267,34 +264,37 @@ export default function CopilotChat({
 
         {loading && (
           <div className="flex justify-start">
-            <div className="bg-white/10 border border-white/10 px-4 py-3 rounded-3xl text-sm text-slate-400">
-              AI is thinking...
+            <div className="bg-slate-900/80 border border-white/10 px-5 py-3.5 rounded-2xl text-sm text-slate-400 flex items-center gap-2">
+              <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce"></div>
+              <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+              <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              <span className="ml-2">AI is thinking...</span>
             </div>
           </div>
         )}
       </div>
 
-      <div className="px-4 py-3 flex gap-2 overflow-x-auto border-t border-white/10">
+      <div className="px-5 py-3 flex gap-2 overflow-x-auto border-t border-white/10 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
         {quickQuestions.map((q) => (
           <button
             key={q}
             onClick={() => send(q)}
-            className="text-xs bg-white/5 border border-white/10 text-slate-300 px-3 py-2 rounded-xl whitespace-nowrap hover:bg-white/10 hover:text-white transition"
+            className="text-xs bg-white/5 border border-white/10 text-slate-300 px-4 py-2.5 rounded-xl whitespace-nowrap hover:bg-cyan-500/10 hover:border-cyan-400/30 hover:text-cyan-200 transition-all duration-200"
           >
             {q}
           </button>
         ))}
       </div>
 
-      <div className="px-5 py-5 border-t border-white/10 flex gap-2">
+      <div className="px-5 py-4 border-t border-white/10 flex gap-3">
         <button
           onClick={startVoiceInput}
           disabled={loading}
           title="Use voice input"
-          className={`px-4 py-3 rounded-2xl text-sm font-bold border transition ${
+          className={`w-12 h-12 shrink-0 rounded-xl text-lg font-bold border transition-all duration-200 flex items-center justify-center ${
             listening
               ? 'bg-red-500/20 border-red-400/40 text-red-300 shadow-lg shadow-red-500/50 animate-pulse'
-              : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:border-violet-400/30 hover:text-violet-300'
+              : 'bg-white/5 border-white/10 text-slate-300 hover:bg-cyan-500/10 hover:border-cyan-400/30 hover:text-cyan-300'
           }`}
         >
           {listening ? '🎙️' : '🎤'}
@@ -308,28 +308,19 @@ export default function CopilotChat({
           placeholder={
             listening
               ? 'Listening...'
-              : 'Ask about deadlines, risk, tasks...'
+              : 'Ask about deadlines, risk...'
           }
-          className="flex-1 bg-white/5 border border-white/10 text-white placeholder:text-slate-500 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+          className="flex-1 min-w-0 bg-slate-900/60 border border-white/10 text-white placeholder:text-slate-500 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-400/30 transition-all"
         />
 
         <button
           onClick={() => send()}
           disabled={loading || !input.trim()}
-          className="bg-gradient-to-r from-violet-500 to-fuchsia-600 text-white px-5 py-3 rounded-2xl text-sm font-bold hover:scale-[1.03] active:scale-95 disabled:opacity-50 transition"
+          className="shrink-0 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white px-5 py-3 rounded-xl text-sm font-bold hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg shadow-cyan-900/30 whitespace-nowrap"
         >
           Send
         </button>
       </div>
-
-      {onReschedule && (
-        <button
-          onClick={onReschedule}
-          className="mx-5 mb-5 bg-white/5 border border-violet-400/30 text-violet-200 py-3 rounded-2xl text-sm font-bold hover:bg-violet-500/10 transition"
-        >
-          Optimize Plan with AI
-        </button>
-      )}
     </div>
   );
 }

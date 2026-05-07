@@ -26,6 +26,11 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('tasks');
   const [activeFeature, setActiveFeature] = useState(null);
+  
+  // Demo Generator State
+  const [demoData, setDemoData] = useState(null);
+  const [demoLoading, setDemoLoading] = useState(false);
+  const [demoError, setDemoError] = useState(null);
 
   useEffect(() => {
     fetchAll();
@@ -82,6 +87,89 @@ export default function Dashboard() {
     } catch (err) {
       alert('Reschedule failed: ' + (err.response?.data?.error || err.message));
     }
+  };
+
+  const handleGenerateDemo = async () => {
+    setDemoLoading(true);
+    setDemoError(null);
+    
+    try {
+      const response = await api.post('/api/ai/demo', { projectId: id });
+      setDemoData(response.data);
+    } catch (err) {
+      const errorMsg = err.response?.data?.error || 'Failed to generate demo';
+      setDemoError(errorMsg);
+      console.error('Demo generation error:', err);
+    } finally {
+      setDemoLoading(false);
+    }
+  };
+
+  const exportAsMarkdown = () => {
+    if (!demoData) return;
+    
+    const markdown = `# ${project.name} - Demo Summary
+
+## Project Overview
+${demoData.overview}
+
+## Problem Statement
+${demoData.problem}
+
+## Implemented Features
+${demoData.features?.map(f => `- ${f}`).join('\n')}
+
+## Tech Stack
+${demoData.techStack?.map(t => `- ${t}`).join('\n')}
+
+## Future Scope
+${demoData.futureScope?.map(f => `- ${f}`).join('\n')}
+
+## Demo Script
+${demoData.demoScript?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
+`;
+
+    const blob = new Blob([markdown], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${project.name.replace(/\s+/g, '-')}-demo.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportAsPDF = () => {
+    if (!demoData) return;
+    
+    // Simple text-based PDF export
+    const text = `${project.name} - DEMO SUMMARY
+
+PROJECT OVERVIEW
+${demoData.overview}
+
+PROBLEM STATEMENT
+${demoData.problem}
+
+IMPLEMENTED FEATURES
+${demoData.features?.map(f => `• ${f}`).join('\n')}
+
+TECH STACK
+${demoData.techStack?.join(', ')}
+
+FUTURE SCOPE
+${demoData.futureScope?.map(f => `• ${f}`).join('\n')}
+
+DEMO SCRIPT
+${demoData.demoScript?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
+`;
+
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${project.name.replace(/\s+/g, '-')}-demo.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const priorityColor = (p) => {
@@ -241,27 +329,153 @@ export default function Dashboard() {
                   features, tech stack, future scope, and demo script.
                 </p>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  {[
-                    'Project Overview',
-                    'Problem Statement',
-                    'Implemented Features',
-                    'Tech Stack',
-                    'Future Scope',
-                    'Demo Script',
-                  ].map((item) => (
-                    <div
-                      key={item}
-                      className="bg-white/5 border border-white/10 rounded-2xl p-4 text-slate-300 font-bold"
-                    >
-                      ✅ {item}
-                    </div>
-                  ))}
-                </div>
+                {demoError && (
+                  <div className="bg-red-500/10 border border-red-500/30 text-red-300 px-4 py-3 rounded-2xl mb-6 text-sm">
+                    {demoError}
+                  </div>
+                )}
 
-                <button className="bg-gradient-to-r from-blue-500 to-violet-600 text-white px-8 py-4 rounded-2xl font-bold hover:scale-[1.02] active:scale-95 transition">
-                  Generate Demo Summary
-                </button>
+                {!demoData ? (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                      {[
+                        'Project Overview',
+                        'Problem Statement',
+                        'Implemented Features',
+                        'Tech Stack',
+                        'Future Scope',
+                        'Demo Script',
+                      ].map((item) => (
+                        <div
+                          key={item}
+                          className="bg-white/5 border border-white/10 rounded-2xl p-4 text-slate-300 font-bold"
+                        >
+                          ✅ {item}
+                        </div>
+                      ))}
+                    </div>
+
+                    <button 
+                      onClick={handleGenerateDemo}
+                      disabled={demoLoading}
+                      className="bg-gradient-to-r from-blue-500 to-violet-600 text-white px-8 py-4 rounded-2xl font-bold hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition"
+                    >
+                      {demoLoading ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                          Generating Demo...
+                        </span>
+                      ) : (
+                        'Generate Demo Summary'
+                      )}
+                    </button>
+                  </>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Export Buttons */}
+                    <div className="flex gap-3 mb-6">
+                      <button
+                        onClick={exportAsMarkdown}
+                        className="flex-1 bg-white/5 border border-white/10 text-slate-300 py-3 px-4 rounded-xl font-bold hover:bg-white/10 transition"
+                      >
+                        📥 Export Markdown
+                      </button>
+                      <button
+                        onClick={exportAsPDF}
+                        className="flex-1 bg-white/5 border border-white/10 text-slate-300 py-3 px-4 rounded-xl font-bold hover:bg-white/10 transition"
+                      >
+                        📄 Export Text
+                      </button>
+                      <button
+                        onClick={() => setDemoData(null)}
+                        className="flex-1 bg-white/5 border border-white/10 text-slate-300 py-3 px-4 rounded-xl font-bold hover:bg-white/10 transition"
+                      >
+                        🔄 Generate New
+                      </button>
+                    </div>
+
+                    {/* Project Overview */}
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+                      <h4 className="text-lg font-black text-emerald-300 mb-3 flex items-center gap-2">
+                        ✅ Project Overview
+                      </h4>
+                      <p className="text-slate-300 leading-relaxed">{demoData.overview}</p>
+                    </div>
+
+                    {/* Problem Statement */}
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+                      <h4 className="text-lg font-black text-yellow-300 mb-3 flex items-center gap-2">
+                        ❓ Problem Statement
+                      </h4>
+                      <p className="text-slate-300 leading-relaxed">{demoData.problem}</p>
+                    </div>
+
+                    {/* Implemented Features */}
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+                      <h4 className="text-lg font-black text-violet-300 mb-3 flex items-center gap-2">
+                        🎯 Implemented Features
+                        <span className="text-xs bg-violet-500/20 text-violet-300 px-2 py-1 rounded-full">
+                          {demoData.features?.length || 0}
+                        </span>
+                      </h4>
+                      <ul className="space-y-2">
+                        {demoData.features?.map((f, i) => (
+                          <li key={i} className="text-slate-300 flex items-start gap-2">
+                            <span className="text-violet-400 mt-1">•</span>
+                            <span>{f}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Tech Stack */}
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+                      <h4 className="text-lg font-black text-blue-300 mb-3 flex items-center gap-2">
+                        ⚙️ Tech Stack
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {demoData.techStack?.map((tech, i) => (
+                          <span 
+                            key={i} 
+                            className="text-sm bg-blue-500/15 text-blue-300 border border-blue-500/30 px-4 py-2 rounded-full font-medium"
+                          >
+                            {tech}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Future Scope */}
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+                      <h4 className="text-lg font-black text-fuchsia-300 mb-3 flex items-center gap-2">
+                        🚀 Future Scope
+                      </h4>
+                      <ul className="space-y-2">
+                        {demoData.futureScope?.map((f, i) => (
+                          <li key={i} className="text-slate-300 flex items-start gap-2">
+                            <span className="text-fuchsia-400 mt-1">•</span>
+                            <span>{f}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Demo Script */}
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+                      <h4 className="text-lg font-black text-orange-300 mb-3 flex items-center gap-2">
+                        🎬 Demo Script
+                      </h4>
+                      <ol className="space-y-3">
+                        {demoData.demoScript?.map((step, i) => (
+                          <li key={i} className="text-slate-300 flex gap-3">
+                            <span className="font-bold text-orange-300 shrink-0">{i + 1}.</span>
+                            <span>{step}</span>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -559,7 +773,6 @@ export default function Dashboard() {
                 tasks={tasks}
                 progress={progress}
                 insight={insight}
-                onReschedule={handleReschedule}
               />
             </div>
           </aside>

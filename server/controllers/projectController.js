@@ -3,13 +3,51 @@ const Task        = require('../models/Task');
 const TaskMapping = require('../models/TaskMapping');
 const { breakdownProject, rescheduleProject } = require('../services/claudeService');
 const { runDelayDetection } = require('../services/delayDetector');
+const { extractTextFromFile, cleanupFile } = require('../services/fileParser');
+const { buildIntelligentContext, combineContextForAI } = require('../services/contextBuilder');
+const { generateEnhancedPlan } = require('../services/intelligentPlanner');
 
 exports.createProject = async (req, res) => {
+  let uploadedFilePath = null;
+  
   try {
     const { name, goal, deadline, hoursPerDay } = req.body;
     if (!name || !goal || !deadline || !hoursPerDay) {
       return res.status(400).json({ error: 'name, goal, deadline, hoursPerDay are required' });
     }
+
+    // Handle uploaded document if present
+    let documentContext = null;
+    let combinedContext = goal;
+
+    if (req.file) {
+      uploadedFilePath = req.file.path;
+      console.log('Processing uploaded document:', req.file.originalname);
+
+      try {
+        // Extract text from document
+        const extractedText = await extractTextFromFile(req.file.path, req.file.mimetype);
+        console.log('Extracted text length:', extractedText.length);
+
+        // Build intelligent context
+        documentContext = buildIntelligentContext(extractedText);
+        console.log('Detected technologies:', documentContext.detectedTechnologies.length);
+        console.log('Detected features:', documentContext.detectedFeatures.length);
+
+        // Combine project brief with document context
+        combinedContext = combineContextForAI(goal, documentContext);
+      } catch (parseError) {
+        console.error('Document parsing error:', parseError.message);
+        // Continue without document context if parsing fails
+      } finally {
+        // Cleanup uploaded file
+        if (uploadedFilePath) {
+          await cleanupFile(uploadedFilePath);
+          uploadedFilePath = null;
+        }
+      }
+    }
+
     const project = await Project.create({
       user: req.user.userId,
       name,
@@ -18,14 +56,23 @@ exports.createProject = async (req, res) => {
       hoursPerDay,
     });
     
-    console.log('Calling AI for task breakdown...');
+    console.log('Calling AI for enhanced task breakdown...');
     
-    let tasks, mapping;
+    let tasks, mapping, insights;
     try {
-      const result = await breakdownProject({ name, goal, deadline, hoursPerDay });
+      // Use enhanced planner with document context
+      const result = await generateEnhancedPlan({
+        name,
+        combinedContext,
+        deadline,
+        hoursPerDay,
+        documentContext
+      });
+
       tasks = result.tasks;
       mapping = result.mapping || {};
-      console.log('AI returned ' + tasks.length + ' tasks');
+      insights = result.insights || {};
+      console.log('AI returned ' + tasks.length + ' tasks with insights');
     } catch (aiError) {
       console.error('AI breakdown failed:', aiError.message);
       console.log('Using fallback task generation...');
@@ -80,6 +127,7 @@ exports.createProject = async (req, res) => {
         },
       ];
       mapping = {};
+      insights = {};
     }
     
     const idMap = {};
@@ -108,10 +156,17 @@ exports.createProject = async (req, res) => {
     res.status(201).json({
       project,
       tasks:   savedTasks,
+      insights: insights,
       message: 'Project created with ' + savedTasks.length + ' tasks',
     });
   } catch (err) {
     console.error('CREATE PROJECT ERROR:', err.message);
+    
+    // Cleanup file on error
+    if (uploadedFilePath) {
+      await cleanupFile(uploadedFilePath);
+    }
+    
     res.status(500).json({ error: err.message });
   }
 };
@@ -211,6 +266,37 @@ exports.getProgress = async (req, res) => {
     }
     res.json(data);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.deleteProject = async (req, res) => {
+  try {
+    const project = await Project.findById(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    
+    // Verify ownership
+    if (project.user.toString() !== req.user.userId) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+    
+    // Delete all related tasks
+    await Task.deleteMany({ project: req.params.id });
+    
+    // Delete all related task mappings
+    await TaskMapping.deleteMany({ project: req.params.id });
+    
+    // Delete all related activity logs if they exist
+    const ActivityLog = require('../models/ActivityLog');
+    await ActivityLog.deleteMany({ project: req.params.id });
+    
+    // Delete the project
+    await Project.findByIdAndDelete(req.params.id);
+    
+    console.log('Project deleted:', req.params.id);
+    res.json({ message: 'Project deleted successfully' });
+  } catch (err) {
+    console.error('DELETE PROJECT ERROR:', err.message);
     res.status(500).json({ error: err.message });
   }
 };

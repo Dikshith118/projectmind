@@ -21,6 +21,7 @@ app.use('/api/auth',     require('./routes/auth'));
 app.use('/api/projects', require('./routes/projects'));
 app.use('/api/activity', require('./routes/activity'));
 app.use('/api/copilot', require('./routes/copilot'));
+app.use('/api/ai', require('./routes/aiFeatures'));
 
 // Health check
 app.get('/health', (req, res) => {

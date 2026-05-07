@@ -32,16 +32,16 @@ export default function Register() {
       <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 glass-card rounded-[2rem] overflow-hidden">
 
         {/* LEFT PANEL */}
-        <div className="hidden lg:flex relative overflow-hidden p-10 text-white flex-col justify-between border-r border-white/10">
-          <div className="absolute -top-24 -right-24 w-80 h-80 bg-violet-600/30 blur-3xl rounded-full"></div>
-          <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-blue-600/20 blur-3xl rounded-full"></div>
+        <div className="hidden lg:flex relative overflow-hidden p-10 text-white flex-col justify-between border-r border-white/8">
+          <div className="absolute -top-24 -right-24 w-80 h-80 bg-cyan-600/12 blur-3xl rounded-full"></div>
+          <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-blue-600/10 blur-3xl rounded-full"></div>
 
           <div className="relative">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center mb-6 shadow-lg shadow-violet-900/40">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center mb-6 shadow-lg shadow-cyan-900/30">
               <span className="font-black text-lg">PM</span>
             </div>
 
-            <p className="inline-flex text-sm text-violet-200 bg-violet-500/10 border border-violet-400/20 rounded-full px-4 py-1 mb-5">
+            <p className="inline-flex text-sm text-cyan-200 bg-cyan-500/10 border border-cyan-400/20 rounded-full px-4 py-1 mb-5">
               🚀 Start your journey
             </p>
 
@@ -75,7 +75,7 @@ export default function Register() {
         {/* RIGHT PANEL */}
         <div className="p-8 sm:p-10">
           <div className="mb-8">
-            <div className="lg:hidden w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center mb-5 shadow-lg shadow-violet-900/40">
+            <div className="lg:hidden w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center mb-5 shadow-lg shadow-cyan-900/30">
               <span className="text-white font-black">PM</span>
             </div>
 
@@ -101,7 +101,7 @@ export default function Register() {
                 required
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="w-full border border-white/10 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 bg-slate-950/60 text-white placeholder:text-slate-500"
+                className="w-full border border-white/10 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-400/30 bg-slate-950/60 text-white placeholder:text-slate-500 transition-all"
                 placeholder="Arjun Sharma"
               />
             </div>
@@ -115,7 +115,7 @@ export default function Register() {
                 required
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="w-full border border-white/10 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 bg-slate-950/60 text-white placeholder:text-slate-500"
+                className="w-full border border-white/10 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-400/30 bg-slate-950/60 text-white placeholder:text-slate-500 transition-all"
                 placeholder="you@example.com"
               />
             </div>
@@ -129,7 +129,7 @@ export default function Register() {
                 required
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
-                className="w-full border border-white/10 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 bg-slate-950/60 text-white placeholder:text-slate-500"
+                className="w-full border border-white/10 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-400/30 bg-slate-950/60 text-white placeholder:text-slate-500 transition-all"
                 placeholder="Min 6 characters"
               />
             </div>
@@ -137,7 +137,7 @@ export default function Register() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-violet-500 to-fuchsia-600 text-white py-3 rounded-2xl font-bold hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition shadow-lg shadow-violet-900/40"
+              className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white py-3 rounded-2xl font-bold hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition-all duration-300 shadow-lg shadow-cyan-900/30"
             >
               {loading ? 'Creating account...' : 'Create account'}
             </button>
@@ -145,7 +145,7 @@ export default function Register() {
 
           <p className="text-center text-sm text-slate-400 mt-6">
             Already have an account?{' '}
-            <Link to="/login" className="text-violet-300 font-bold hover:text-fuchsia-300 transition">
+            <Link to="/login" className="text-cyan-300 font-bold hover:text-cyan-200 transition">
               Sign in
             </Link>
           </p>
