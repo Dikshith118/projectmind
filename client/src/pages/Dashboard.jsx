@@ -14,6 +14,7 @@ import {
 import api from '../api/client';
 import CopilotChat from '../components/CopilotChat';
 import FocusMode from '../components/FocusMode';
+import SpeedoMeter from '../components/SpeedoMeter';
 
 export default function Dashboard() {
   const { id } = useParams();
@@ -614,15 +615,16 @@ ${demoData.demoScript?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white/10 border border-white/10 backdrop-blur rounded-3xl px-6 py-5 text-center">
-                <p className="text-5xl font-black text-white">{completionPct}%</p>
-                <p className="text-sm text-slate-300 mt-1">Completed</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+              {/* Speedometer */}
+              <div className="bg-white/5 border border-white/10 backdrop-blur rounded-3xl p-6 flex items-center justify-center">
+                <SpeedoMeter percentage={completionPct} label="Completed" />
               </div>
 
-              <div className="bg-white/10 border border-white/10 backdrop-blur rounded-3xl px-6 py-5 text-center">
+              {/* Risk Level */}
+              <div className="bg-white/10 border border-white/10 backdrop-blur rounded-3xl p-8 text-center flex flex-col items-center justify-center min-h-[180px]">
                 <p
-                  className={`text-4xl font-black ${
+                  className={`text-6xl font-black mb-3 ${
                     riskLevel === 'High'
                       ? 'text-red-300'
                       : riskLevel === 'Medium'
@@ -632,14 +634,14 @@ ${demoData.demoScript?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
                 >
                   {riskLevel}
                 </p>
-                <p className="text-sm text-slate-300 mt-1">Risk Level</p>
+                <p className="text-sm text-slate-300 font-semibold uppercase tracking-wide">Risk Level</p>
               </div>
             </div>
           </div>
 
           <div className="relative w-full bg-white/10 rounded-full h-3 mt-8 overflow-hidden">
             <div
-              className="bg-gradient-to-r from-violet-400 to-fuchsia-500 h-3 rounded-full transition-all duration-700"
+              className="bg-gradient-to-r from-cyan-400 to-blue-500 h-3 rounded-full transition-all duration-700"
               style={{ width: `${completionPct}%` }}
             />
           </div>
