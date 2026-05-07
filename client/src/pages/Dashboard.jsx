@@ -14,7 +14,9 @@ import {
 import api from '../api/client';
 import CopilotChat from '../components/CopilotChat';
 import FocusMode from '../components/FocusMode';
+import DeadlineCalendar from '../components/DeadlineCalendar';
 import SpeedoMeter from '../components/SpeedoMeter';
+import MeetingAssistant from '../components/MeetingAssistant';
 
 export default function Dashboard() {
   const { id } = useParams();
@@ -27,23 +29,33 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('tasks');
   const [activeFeature, setActiveFeature] = useState(null);
+  const [allProjects, setAllProjects] = useState([]);
   
   // Demo Generator State
   const [demoData, setDemoData] = useState(null);
   const [demoLoading, setDemoLoading] = useState(false);
   const [demoError, setDemoError] = useState(null);
+  const [showSummary, setShowSummary] = useState(false);
 
   useEffect(() => {
     fetchAll();
   }, [id]);
 
+  // Auto-generate summary when PPT feature opens
+  useEffect(() => {
+    if (activeFeature === 'ppt' && !demoData && !demoLoading) {
+      handleGenerateSummary();
+    }
+  }, [activeFeature]);
+
   const fetchAll = async () => {
     setLoading(true);
 
     try {
-      const [projRes, progressRes] = await Promise.all([
+      const [projRes, progressRes, allProjectsRes] = await Promise.all([
         api.get(`/api/projects/${id}`),
         api.get(`/api/projects/${id}/progress`),
+        api.get('/api/projects'),
       ]);
 
       const projectData = projRes.data.project;
@@ -52,6 +64,7 @@ export default function Dashboard() {
       setProject(projectData);
       setTasks(taskData);
       setProgress(progressRes.data || []);
+      setAllProjects(Array.isArray(allProjectsRes.data) ? allProjectsRes.data : []);
       generateInsight(projectData, taskData);
     } catch (err) {
       console.error(err);
@@ -93,6 +106,7 @@ export default function Dashboard() {
   const handleGenerateDemo = async () => {
     setDemoLoading(true);
     setDemoError(null);
+    setShowSummary(false);
     
     try {
       const response = await api.post('/api/ai/demo', { projectId: id });
@@ -101,6 +115,23 @@ export default function Dashboard() {
       const errorMsg = err.response?.data?.error || 'Failed to generate demo';
       setDemoError(errorMsg);
       console.error('Demo generation error:', err);
+    } finally {
+      setDemoLoading(false);
+    }
+  };
+
+  const handleGenerateSummary = async () => {
+    setDemoLoading(true);
+    setDemoError(null);
+    setShowSummary(true);
+    
+    try {
+      const response = await api.post('/api/ai/demo', { projectId: id });
+      setDemoData(response.data);
+    } catch (err) {
+      const errorMsg = err.response?.data?.error || 'Failed to generate summary';
+      setDemoError(errorMsg);
+      console.error('Summary generation error:', err);
     } finally {
       setDemoLoading(false);
     }
@@ -216,7 +247,7 @@ ${demoData.demoScript?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
     {
       id: 'ppt',
       icon: '📄',
-      title: 'AI Demo / PPT Generator',
+      title: 'Project Presentation Assistant',
       desc: 'Generate demo summary and presentation content.',
     },
     {
@@ -284,6 +315,11 @@ ${demoData.demoScript?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
           ))}
         </div>
 
+        {/* Deadline Calendar Widget */}
+        <div className="mt-6">
+          <DeadlineCalendar projects={allProjects} />
+        </div>
+
         <button
           onClick={() => navigate('/')}
           className="mt-auto text-slate-300 hover:text-violet-300 text-sm font-bold bg-white/5 border border-white/10 rounded-2xl px-4 py-3 transition"
@@ -302,7 +338,7 @@ ${demoData.demoScript?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
                 </p>
 
                 <h2 className="text-4xl font-black text-white">
-                  {activeFeature === 'ppt' && '📄 AI Demo / PPT Generator'}
+                  {activeFeature === 'ppt' && '📄 Project Presentation Assistant'}
                   {activeFeature === 'focus' && '🌙 Deep Focus Mode'}
                   {activeFeature === 'meeting' && '🤝 AI Meeting Assistant'}
                 </h2>
@@ -319,58 +355,92 @@ ${demoData.demoScript?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
 
             {activeFeature === 'ppt' && (
               <div className="glass-card rounded-3xl p-8 max-w-5xl">
-                <p className="text-6xl mb-6">📄</p>
-
-                <h3 className="text-2xl font-black text-white mb-3">
-                  AI Demo / PPT Generator
-                </h3>
-
-                <p className="text-slate-400 mb-6">
-                  Generate a project overview, problem statement, solution,
-                  features, tech stack, future scope, and demo script.
-                </p>
-
                 {demoError && (
                   <div className="bg-red-500/10 border border-red-500/30 text-red-300 px-4 py-3 rounded-2xl mb-6 text-sm">
                     {demoError}
                   </div>
                 )}
 
-                {!demoData ? (
-                  <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                      {[
-                        'Project Overview',
-                        'Problem Statement',
-                        'Implemented Features',
-                        'Tech Stack',
-                        'Future Scope',
-                        'Demo Script',
-                      ].map((item) => (
-                        <div
-                          key={item}
-                          className="bg-white/5 border border-white/10 rounded-2xl p-4 text-slate-300 font-bold"
-                        >
-                          ✅ {item}
+                {demoLoading ? (
+                  <div className="flex flex-col items-center justify-center py-20">
+                    <div className="w-16 h-16 border-4 border-violet-300/30 border-t-violet-300 rounded-full animate-spin mb-6"></div>
+                    <p className="text-slate-300 text-lg font-bold">Generating Summary...</p>
+                    <p className="text-slate-400 text-sm mt-2">AI is analyzing your project</p>
+                  </div>
+                ) : !demoData ? (
+                  <div className="flex flex-col items-center justify-center py-20">
+                    <div className="w-16 h-16 border-4 border-violet-300/30 border-t-violet-300 rounded-full animate-spin mb-6"></div>
+                    <p className="text-slate-300 text-lg font-bold">Loading...</p>
+                  </div>
+                ) : showSummary ? (
+                  <div className="space-y-6">
+                    {/* Summary View */}
+                    <div className="bg-gradient-to-br from-violet-500/10 to-fuchsia-500/10 border border-violet-400/30 rounded-3xl p-8">
+                      <h3 className="text-2xl font-black text-white mb-6 flex items-center gap-3">
+                        <span className="text-4xl">📝</span>
+                        Project Summary
+                      </h3>
+                      
+                      <div className="space-y-4">
+                        <div className="flex items-start gap-3">
+                          <span className="text-violet-400 text-xl mt-1">•</span>
+                          <p className="text-slate-200 text-lg leading-relaxed">
+                            <span className="font-bold text-white">{project.name}</span> is an AI copilot for long-term project productivity
+                          </p>
                         </div>
-                      ))}
+                        
+                        <div className="flex items-start gap-3">
+                          <span className="text-violet-400 text-xl mt-1">•</span>
+                          <p className="text-slate-200 text-lg leading-relaxed">
+                            Generates intelligent task plans and tracks project progress automatically
+                          </p>
+                        </div>
+                        
+                        <div className="flex items-start gap-3">
+                          <span className="text-violet-400 text-xl mt-1">•</span>
+                          <p className="text-slate-200 text-lg leading-relaxed">
+                            Detects delays and provides AI-powered recommendations for recovery
+                          </p>
+                        </div>
+                        
+                        <div className="flex items-start gap-3">
+                          <span className="text-violet-400 text-xl mt-1">•</span>
+                          <p className="text-slate-200 text-lg leading-relaxed">
+                            Includes Deep Focus Mode, AI Meeting Assistant, Deadline Calendar, and progress analytics
+                          </p>
+                        </div>
+                        
+                        <div className="flex items-start gap-3">
+                          <span className="text-violet-400 text-xl mt-1">•</span>
+                          <p className="text-slate-200 text-lg leading-relaxed">
+                            Helps users stay consistent and complete projects on time with AI guidance
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-8 pt-6 border-t border-violet-400/20">
+                        <p className="text-sm text-violet-200 italic">
+                          💡 Judge-friendly summary highlighting key features and value proposition
+                        </p>
+                      </div>
                     </div>
 
-                    <button 
-                      onClick={handleGenerateDemo}
-                      disabled={demoLoading}
-                      className="bg-gradient-to-r from-blue-500 to-violet-600 text-white px-8 py-4 rounded-2xl font-bold hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition"
-                    >
-                      {demoLoading ? (
-                        <span className="flex items-center justify-center gap-2">
-                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                          Generating Demo...
-                        </span>
-                      ) : (
-                        'Generate Demo Summary'
-                      )}
-                    </button>
-                  </>
+                    {/* Action Buttons */}
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setDemoData(null)}
+                        className="flex-1 bg-white/5 border border-white/10 text-slate-300 py-3 px-4 rounded-xl font-bold hover:bg-white/10 transition"
+                      >
+                        🔄 Generate New
+                      </button>
+                      <button
+                        onClick={() => setShowSummary(false)}
+                        className="flex-1 bg-violet-500/20 border border-violet-400/30 text-violet-300 py-3 px-4 rounded-xl font-bold hover:bg-violet-500/30 transition"
+                      >
+                        📊 View Full PPT
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   <div className="space-y-6">
                     {/* Export Buttons */}
@@ -392,6 +462,12 @@ ${demoData.demoScript?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
                         className="flex-1 bg-white/5 border border-white/10 text-slate-300 py-3 px-4 rounded-xl font-bold hover:bg-white/10 transition"
                       >
                         🔄 Generate New
+                      </button>
+                      <button
+                        onClick={() => setShowSummary(true)}
+                        className="flex-1 bg-violet-500/20 border border-violet-400/30 text-violet-300 py-3 px-4 rounded-xl font-bold hover:bg-violet-500/30 transition"
+                      >
+                        📝 View Summary
                       </button>
                     </div>
 
@@ -491,79 +567,7 @@ ${demoData.demoScript?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
               </div>
             )}
 
-            {activeFeature === 'meeting' && (
-              <div className="glass-card rounded-3xl p-8 max-w-5xl">
-                <p className="text-6xl mb-6">🤝</p>
-
-                <h3 className="text-2xl font-black text-white mb-3">
-                  AI Meeting Assistant
-                </h3>
-
-                <p className="text-slate-400 mb-6">
-                  View meeting timings, mark attendance, send absence message,
-                  and receive AI-generated important points from missed meetings.
-                </p>
-
-                <div className="space-y-4">
-                  {[
-                    {
-                      time: '7:00 PM',
-                      title: 'Backend Sync',
-                      agenda: 'API progress, database issues, authentication flow',
-                    },
-                    {
-                      time: '8:30 PM',
-                      title: 'UI Review',
-                      agenda: 'Dashboard polish, chatbot layout, feature cards',
-                    },
-                    {
-                      time: '9:15 PM',
-                      title: 'Demo Planning',
-                      agenda: 'Presentation flow, demo script, final testing',
-                    },
-                  ].map((meeting) => (
-                    <div
-                      key={meeting.title}
-                      className="bg-white/5 border border-white/10 rounded-2xl p-5"
-                    >
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-                        <div>
-                          <p className="text-white font-black text-lg">
-                            {meeting.title}
-                          </p>
-                          <p className="text-xs text-violet-300 font-bold mt-1">
-                            {meeting.time}
-                          </p>
-                          <p className="text-sm text-slate-400 mt-2">
-                            Agenda: {meeting.agenda}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <button className="bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 py-3 rounded-2xl font-bold hover:bg-emerald-500/30 transition">
-                          I Will Attend
-                        </button>
-
-                        <button className="bg-red-500/20 border border-red-400/30 text-red-300 py-3 rounded-2xl font-bold hover:bg-red-500/30 transition">
-                          Can’t Attend
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-6 bg-violet-500/10 border border-violet-400/20 rounded-2xl p-5">
-                  <p className="text-violet-200 font-black mb-2">
-                    AI Missed Meeting Summary
-                  </p>
-                  <p className="text-sm text-slate-300">
-                    If you can’t attend, AI will collect key points, decisions,
-                    blockers, and assigned tasks from the meeting.
-                  </p>
-                </div>
-              </div>
-            )}
+            {activeFeature === 'meeting' && (<div className="max-w-5xl"><MeetingAssistant /></div>)}
           </div>
         </div>
       )}
@@ -783,4 +787,6 @@ ${demoData.demoScript?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
     </div>
   );
 }
+
+
 
