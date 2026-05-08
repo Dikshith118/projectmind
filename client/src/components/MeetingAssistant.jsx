@@ -25,9 +25,11 @@ export default function MeetingAssistant() {
     date: '',
     time: '',
     agenda: '',
-    priority: 'medium',
-    teamMembers: '',
+    candidates: [], // Array of {name, email}
   });
+
+  const [candidateName, setCandidateName] = useState('');
+  const [candidateEmail, setCandidateEmail] = useState('');
 
   // Mock email data for simulation
   const mockMeetingEmails = [
@@ -403,6 +405,44 @@ AI Recommendation: Prioritize stability over new features for demo. Use pre-reco
     showToast('✅ Meeting notes saved successfully', 'success');
   };
 
+  const addCandidate = () => {
+    if (!candidateName.trim()) {
+      showToast('⚠️ Please enter candidate name', 'warning');
+      return;
+    }
+    if (!candidateEmail.trim()) {
+      showToast('⚠️ Please enter candidate email', 'warning');
+      return;
+    }
+    if (!candidateEmail.includes('@')) {
+      showToast('⚠️ Please enter a valid email address', 'warning');
+      return;
+    }
+
+    const newCandidate = {
+      id: Date.now(),
+      name: candidateName.trim(),
+      email: candidateEmail.trim().toLowerCase(),
+    };
+
+    setNewMeeting({
+      ...newMeeting,
+      candidates: [...newMeeting.candidates, newCandidate],
+    });
+
+    setCandidateName('');
+    setCandidateEmail('');
+    showToast('✅ Candidate added successfully', 'success');
+  };
+
+  const removeCandidate = (candidateId) => {
+    setNewMeeting({
+      ...newMeeting,
+      candidates: newMeeting.candidates.filter(c => c.id !== candidateId),
+    });
+    showToast('🗑️ Candidate removed', 'info');
+  };
+
   const handleScheduleMeeting = (e) => {
     e.preventDefault();
     const meeting = {
@@ -418,9 +458,10 @@ AI Recommendation: Prioritize stability over new features for demo. Use pre-reco
       date: '',
       time: '',
       agenda: '',
-      priority: 'medium',
-      teamMembers: '',
+      candidates: [],
     });
+    setCandidateName('');
+    setCandidateEmail('');
     showToast('✅ Meeting scheduled successfully!', 'success');
   };
 
@@ -435,11 +476,7 @@ AI Recommendation: Prioritize stability over new features for demo. Use pre-reco
     aiSummaries: meetings.filter(m => m.aiSummary).length,
   };
 
-  const priorityColor = (priority) => {
-    if (priority === 'high') return 'bg-red-500/15 text-red-300 border-red-500/30';
-    if (priority === 'medium') return 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30';
-    return 'bg-blue-500/15 text-blue-300 border-blue-500/30';
-  };
+
 
   const statusBadge = (meeting) => {
     if (meeting.status === 'completed' && meeting.attendance === 'attending') {
@@ -603,9 +640,6 @@ AI Recommendation: Prioritize stability over new features for demo. Use pre-reco
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <p className="text-white font-black text-lg">{meeting.title}</p>
-                    <span className={`text-xs px-3 py-1 rounded-full font-bold border ${priorityColor(meeting.priority)}`}>
-                      {meeting.priority}
-                    </span>
                     {statusBadge(meeting)}
                   </div>
                   {meeting.projectName && (
@@ -790,28 +824,81 @@ AI Recommendation: Prioritize stability over new features for demo. Use pre-reco
                 />
               </div>
 
+              {/* Candidates Section */}
               <div>
-                <label className="block text-sm font-bold text-slate-300 mb-2">Priority</label>
-                <select
-                  value={newMeeting.priority}
-                  onChange={(e) => setNewMeeting({ ...newMeeting, priority: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-violet-400 transition"
-                >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                </select>
-              </div>
+                <label className="block text-sm font-bold text-slate-300 mb-3">
+                  Candidates
+                  {newMeeting.candidates.length > 0 && (
+                    <span className="ml-2 text-xs bg-violet-500/20 text-violet-300 px-2 py-1 rounded-full">
+                      {newMeeting.candidates.length}
+                    </span>
+                  )}
+                </label>
 
-              <div>
-                <label className="block text-sm font-bold text-slate-300 mb-2">Team Members (optional)</label>
-                <input
-                  type="text"
-                  value={newMeeting.teamMembers}
-                  onChange={(e) => setNewMeeting({ ...newMeeting, teamMembers: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-violet-400 transition"
-                  placeholder="e.g., John, Sarah, Mike"
-                />
+                {/* Add Candidate Form */}
+                <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Name</label>
+                      <input
+                        type="text"
+                        value={candidateName}
+                        onChange={(e) => setCandidateName(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-violet-400 transition text-sm"
+                        placeholder="Enter name"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Email</label>
+                      <input
+                        type="email"
+                        value={candidateEmail}
+                        onChange={(e) => setCandidateEmail(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-violet-400 transition text-sm"
+                        placeholder="Enter email"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addCandidate}
+                    className="w-full bg-violet-500/20 border border-violet-400/30 text-violet-300 py-2 rounded-lg font-bold hover:bg-violet-500/30 transition-all text-sm"
+                  >
+                    <span className="mr-2">➕</span>
+                    Add Candidate
+                  </button>
+                </div>
+
+                {/* Candidates List */}
+                {newMeeting.candidates.length > 0 && (
+                  <div className="space-y-2">
+                    {newMeeting.candidates.map((candidate) => (
+                      <div
+                        key={candidate.id}
+                        className="bg-white/5 border border-white/10 rounded-xl p-3 flex items-center justify-between hover:bg-white/10 transition"
+                      >
+                        <div className="flex-1">
+                          <p className="text-white font-bold text-sm">{candidate.name}</p>
+                          <p className="text-slate-400 text-xs">{candidate.email}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeCandidate(candidate.id)}
+                          className="w-8 h-8 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 transition flex items-center justify-center"
+                          title="Remove candidate"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {newMeeting.candidates.length === 0 && (
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
+                    <p className="text-slate-400 text-sm">No candidates added yet</p>
+                  </div>
+                )}
               </div>
 
               <div className="bg-violet-500/10 border border-violet-400/20 rounded-2xl p-4">
