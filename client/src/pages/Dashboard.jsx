@@ -17,6 +17,16 @@ import FocusMode from '../components/FocusMode';
 import DeadlineCalendar from '../components/DeadlineCalendar';
 import SpeedoMeter from '../components/SpeedoMeter';
 import MeetingAssistant from '../components/MeetingAssistant';
+import ProductivityMetrics from '../components/ProductivityMetrics';
+import AIInsights from '../components/AIInsights';
+import ActivityFeed from '../components/ActivityFeed';
+import TaskInference from '../components/TaskInference';
+import useRealtimeProject from '../hooks/useRealtimeProject';
+import LiveActivityFeed from '../components/LiveActivityFeed';
+import RealtimeNotifications from '../components/RealtimeNotifications';
+import LiveProductivityPulse from '../components/LiveProductivityPulse';
+import ConnectionStatus from '../components/ConnectionStatus';
+import AIExplanationsDashboard from '../components/AIExplanationsDashboard';
 
 export default function Dashboard() {
   const { id } = useParams();
@@ -36,6 +46,18 @@ export default function Dashboard() {
   const [demoLoading, setDemoLoading] = useState(false);
   const [demoError, setDemoError] = useState(null);
   const [showSummary, setShowSummary] = useState(false);
+
+  // Real-time state
+  const {
+    connected,
+    activityFeed,
+    notifications,
+    liveMetrics,
+    connectedClients,
+    requestProductivityUpdate,
+    requestInsights,
+    clearNotifications
+  } = useRealtimeProject(id, null); // Pass userId if available
 
   useEffect(() => {
     fetchAll();
@@ -262,6 +284,18 @@ ${demoData.demoScript?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
       title: 'AI Meeting Assistant',
       desc: 'Manage meetings, absence notes, and summaries.',
     },
+    {
+      id: 'analytics',
+      icon: '📊',
+      title: 'Activity Intelligence',
+      desc: 'AI-powered productivity analytics and insights.',
+    },
+    {
+      id: 'explanations',
+      icon: '🧠',
+      title: 'AI Reasoning & Explanations',
+      desc: 'Transparent AI decisions with detailed reasoning.',
+    },
   ];
 
   if (loading) {
@@ -285,6 +319,12 @@ ${demoData.demoScript?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
 
   return (
     <div className="min-h-screen text-slate-100 flex">
+      {/* Real-time Notifications */}
+      <RealtimeNotifications 
+        notifications={notifications} 
+        onClear={(id) => clearNotifications()}
+      />
+
       <aside className="hidden lg:flex w-72 min-h-screen sticky top-0 glass-card border-r border-white/10 p-6 flex-col">
         <div className="flex items-center gap-3 mb-10">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center shadow-lg shadow-violet-900/40">
@@ -295,6 +335,11 @@ ${demoData.demoScript?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
             <p className="font-black text-white text-lg">ProjectMind</p>
             <p className="text-xs text-violet-200/70">AI Copilot</p>
           </div>
+        </div>
+
+        {/* Connection Status */}
+        <div className="mb-6">
+          <ConnectionStatus connected={connected} connectedClients={connectedClients} />
         </div>
 
         <div className="space-y-2">
@@ -341,6 +386,8 @@ ${demoData.demoScript?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
                   {activeFeature === 'ppt' && '📄 Project Presentation Assistant'}
                   {activeFeature === 'focus' && '🌙 Deep Focus Mode'}
                   {activeFeature === 'meeting' && '🤝 AI Meeting Assistant'}
+                  {activeFeature === 'analytics' && '📊 Activity Intelligence'}
+                  {activeFeature === 'explanations' && '🧠 AI Reasoning & Explanations'}
                 </h2>
               </div>
 
@@ -568,6 +615,30 @@ ${demoData.demoScript?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
             )}
 
             {activeFeature === 'meeting' && (<div className="max-w-5xl"><MeetingAssistant /></div>)}
+
+            {activeFeature === 'analytics' && (
+              <div className="max-w-7xl">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Left Column - Metrics & Insights */}
+                  <div className="lg:col-span-2 space-y-6">
+                    <ProductivityMetrics projectId={id} />
+                    <AIInsights projectId={id} />
+                    <ActivityFeed projectId={id} />
+                  </div>
+
+                  {/* Right Column - Task Inference */}
+                  <div className="lg:col-span-1">
+                    <TaskInference projectId={id} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeFeature === 'explanations' && (
+              <div className="max-w-5xl">
+                <AIExplanationsDashboard projectId={id} />
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -600,9 +671,12 @@ ${demoData.demoScript?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
 
           <div className="relative flex flex-col xl:flex-row xl:items-center xl:justify-between gap-8">
             <div>
-              <p className="inline-flex items-center gap-2 text-sm text-violet-200 bg-violet-500/10 border border-violet-400/20 rounded-full px-4 py-1 mb-4">
-                📊 Project Dashboard
-              </p>
+              <div className="flex items-center gap-3 mb-4">
+                <p className="inline-flex items-center gap-2 text-sm text-violet-200 bg-violet-500/10 border border-violet-400/20 rounded-full px-4 py-1">
+                  📊 Project Dashboard
+                </p>
+                <ConnectionStatus connected={connected} connectedClients={connectedClients} />
+              </div>
 
               <h1 className="text-4xl md:text-6xl font-black tracking-tight text-white">
                 {project.name}
@@ -710,7 +784,7 @@ ${demoData.demoScript?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
             )}
 
             <div className="flex gap-3 mb-4">
-              {['tasks', 'all'].map((tab) => (
+              {['tasks', 'all', 'realtime'].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -720,13 +794,35 @@ ${demoData.demoScript?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
                       : 'bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10'
                   }`}
                 >
-                  {tab === 'tasks' ? "Today's Tasks" : 'All Tasks'}
+                  {tab === 'tasks' && "Today's Tasks"}
+                  {tab === 'all' && 'All Tasks'}
+                  {tab === 'realtime' && (
+                    <span className="flex items-center gap-2">
+                      📡 Real-Time
+                      {connected && <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
 
             <div className="glass-card rounded-3xl overflow-hidden">
-              {filteredTasks.length === 0 ? (
+              {activeTab === 'realtime' ? (
+                // Real-Time View
+                <div className="p-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Live Activity Feed */}
+                    <LiveActivityFeed activityFeed={activityFeed} connected={connected} />
+
+                    {/* Live Productivity Pulse */}
+                    <LiveProductivityPulse 
+                      liveMetrics={liveMetrics} 
+                      connected={connected}
+                      onRefresh={requestProductivityUpdate}
+                    />
+                  </div>
+                </div>
+              ) : filteredTasks.length === 0 ? (
                 <div className="p-10 text-center">
                   <p className="text-5xl mb-3">📝</p>
                   <p className="text-slate-400 text-sm">
