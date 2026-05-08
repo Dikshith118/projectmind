@@ -1,9 +1,7 @@
-const Groq = require('groq-sdk');
+const aiProvider = require('./aiProvider');
 const taskCorrelationEngine = require('./taskCorrelationEngine');
 const productivityScorer = require('./productivityScorer');
 const activityAnalyzer = require('./activityAnalyzer');
-
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 /**
  * Generate AI-powered productivity insights
@@ -43,13 +41,9 @@ class InsightGenerator {
         fileDistribution
       });
       
-      // Generate insights using Groq AI
-      const completion = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          {
-            role: 'system',
-            content: `You are an AI productivity analyst for ProjectMind. Analyze coding activity data and provide actionable insights.
+      // Generate insights using unified AI provider (Groq or Ollama with fallback)
+      const result = await aiProvider.generateText(context, {
+        systemPrompt: `You are an AI productivity analyst for ProjectMind. Analyze coding activity data and provide actionable insights.
             
 Your insights should:
 - Be specific and data-driven
@@ -58,18 +52,12 @@ Your insights should:
 - Be encouraging but honest
 - Focus on productivity optimization
 
-Format: Return 3-5 concise insights as a JSON array of strings.`
-          },
-          {
-            role: 'user',
-            content: context
-          }
-        ],
+Format: Return 3-5 concise insights as a JSON array of strings.`,
         temperature: 0.7,
-        max_tokens: 500
+        maxTokens: 500
       });
       
-      const response = completion.choices[0]?.message?.content || '[]';
+      const response = result.text || '[]';
       
       // Parse AI response
       let insights = [];

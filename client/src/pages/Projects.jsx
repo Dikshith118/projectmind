@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import { useAuthStore } from '../store/authStore';
 import FileUpload from '../components/FileUpload';
+import TeamMembersSection from '../components/TeamMembersSection';
 
 export default function Projects() {
   const [projects, setProjects] = useState([]);
@@ -10,6 +11,7 @@ export default function Projects() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', goal: '', deadline: '', hoursPerDay: 2 });
   const [selectedFile, setSelectedFile] = useState(null);
+  const [teamMembers, setTeamMembers] = useState([]);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
   const [aiInsights, setAiInsights] = useState(null);
@@ -48,6 +50,11 @@ export default function Projects() {
       formData.append('deadline', form.deadline);
       formData.append('hoursPerDay', form.hoursPerDay);
       
+      // Add team members if any
+      if (teamMembers.length > 0) {
+        formData.append('teamMembers', JSON.stringify(teamMembers));
+      }
+      
       if (selectedFile) {
         formData.append('document', selectedFile);
       }
@@ -68,6 +75,7 @@ export default function Projects() {
         setShowForm(false);
         setForm({ name: '', goal: '', deadline: '', hoursPerDay: 2 });
         setSelectedFile(null);
+        setTeamMembers([]);
         setAiInsights(null);
         fetchProjects();
       }, aiInsights ? 5000 : 1000);
@@ -259,6 +267,11 @@ export default function Projects() {
                 onFileSelect={setSelectedFile}
                 onFileRemove={() => setSelectedFile(null)}
                 selectedFile={selectedFile}
+              />
+
+              <TeamMembersSection
+                teamMembers={teamMembers}
+                onTeamMembersChange={setTeamMembers}
               />
 
               <div>

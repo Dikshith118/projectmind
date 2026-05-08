@@ -2,6 +2,8 @@ const vscode  = require('vscode');
 const tracker = require('./tracker.js');
 
 function activate(context) {
+  console.log('[PROJECTMIND] ===== EXTENSION ACTIVATED =====');
+  
   // Start tracking file activity
   tracker.start(context);
 

@@ -1,7 +1,4 @@
-const Groq = require('groq-sdk');
-
-const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
-const MODEL = 'llama-3.3-70b-versatile';
+const aiProvider = require('./aiProvider');
 
 /**
  * COMMIT ANALYZER
@@ -68,24 +65,13 @@ class CommitAnalyzer {
     try {
       const prompt = this._buildInsightsPrompt(commits, projectContext);
 
-      const response = await client.chat.completions.create({
-        model: MODEL,
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an AI productivity analyst. Analyze commit patterns and generate 3-5 specific, actionable insights about development progress and velocity.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        max_tokens: 800,
+      const result = await aiProvider.generateText(prompt, {
+        systemPrompt: 'You are an AI productivity analyst. Analyze commit patterns and generate 3-5 specific, actionable insights about development progress and velocity.',
+        maxTokens: 800,
         temperature: 0.5
       });
 
-      const raw = response.choices[0].message.content.trim();
-      return this._parseInsights(raw);
+      return this._parseInsights(result.text);
 
     } catch (error) {
       console.error('[CommitAnalyzer] Insights error:', error.message);
@@ -261,19 +247,18 @@ Return JSON only:
   "alternatives": [{"taskIndex": <number>, "confidence": <number>}]
 }`;
 
-      const response = await client.chat.completions.create({
-        model: MODEL,
-        messages: [
-          { role: 'system', content: 'You are a task correlation AI. Analyze commits and match them to tasks.' },
-          { role: 'user', content: prompt }
-        ],
-        max_tokens: 300,
+      const aiResult = await aiProvider.generateStructuredResponse(prompt, {
+        taskIndex: 'number or null',
+        confidence: 'number 0-100',
+        reason: 'string',
+        alternatives: 'array of {taskIndex: number, confidence: number}'
+      }, {
+        systemPrompt: 'You are a task correlation AI. Analyze commits and match them to tasks.',
+        maxTokens: 300,
         temperature: 0.3
       });
 
-      const raw = response.choices[0].message.content.trim();
-      const clean = raw.replace(/```json|```/g, '').trim();
-      const result = JSON.parse(clean);
+      const result = aiResult.data;
 
       return {
         taskId: result.taskIndex ? tasks[result.taskIndex - 1]._id : null,

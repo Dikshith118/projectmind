@@ -1,8 +1,5 @@
-const Groq = require('groq-sdk');
+const aiProvider = require('./aiProvider');
 const aiContextEngine = require('./aiContextEngine');
-
-const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
-const MODEL = 'llama-3.3-70b-versatile';
 
 /**
  * UNIFIED AI REASONING ENGINE
@@ -43,23 +40,20 @@ class AIReasoningEngine {
       // Combine context + system prompt
       const fullSystemPrompt = `${systemPrompt}\n\n${contextPrompt}`;
 
-      // Call Groq AI
-      const response = await client.chat.completions.create({
-        model: MODEL,
-        messages: [
-          { role: 'system', content: fullSystemPrompt },
-          { role: 'user', content: userQuery }
-        ],
-        max_tokens: options.maxTokens || 1000,
+      // Call unified AI provider (Groq or Ollama with fallback)
+      const result = await aiProvider.generateText(userQuery, {
+        systemPrompt: fullSystemPrompt,
+        maxTokens: options.maxTokens || 1000,
         temperature: options.temperature || 0.5
       });
 
-      const aiResponse = response.choices[0].message.content.trim();
-
       return {
-        response: aiResponse,
+        response: result.text,
         context: unifiedContext,
         module,
+        provider: result.provider,
+        model: result.model,
+        responseTime: result.responseTime,
         timestamp: new Date()
       };
 
@@ -100,27 +94,22 @@ class AIReasoningEngine {
       const jsonInstruction = `\n\nReturn ONLY valid JSON matching this schema:\n${JSON.stringify(schema, null, 2)}\n\nNo markdown. No explanation. JSON only.`;
 
       // Combine
-      const fullSystemPrompt = `${systemPrompt}\n\n${contextPrompt}${jsonInstruction}`;
+      const fullSystemPrompt = `${systemPrompt}\n\n${contextPrompt}`;
 
-      // Call Groq AI
-      const response = await client.chat.completions.create({
-        model: MODEL,
-        messages: [
-          { role: 'system', content: fullSystemPrompt },
-          { role: 'user', content: userQuery }
-        ],
-        max_tokens: options.maxTokens || 2000,
+      // Call unified AI provider (Groq or Ollama with fallback)
+      const result = await aiProvider.generateStructuredResponse(userQuery, schema, {
+        systemPrompt: fullSystemPrompt,
+        maxTokens: options.maxTokens || 2000,
         temperature: options.temperature || 0.3
       });
 
-      const raw = response.choices[0].message.content.trim();
-      const clean = raw.replace(/```json|```/g, '').trim();
-      const parsed = JSON.parse(clean);
-
       return {
-        data: parsed,
+        data: result.data,
         context: unifiedContext,
         module,
+        provider: result.provider,
+        model: result.model,
+        responseTime: result.responseTime,
         timestamp: new Date()
       };
 
@@ -256,17 +245,13 @@ AWARENESS:
       
       const contextStr = `QUICK CONTEXT:\n${JSON.stringify(minimalContext, null, 2)}`;
 
-      const response = await client.chat.completions.create({
-        model: MODEL,
-        messages: [
-          { role: 'system', content: `${systemPrompt}\n\n${contextStr}` },
-          { role: 'user', content: query }
-        ],
-        max_tokens: 300,
+      const result = await aiProvider.generateText(query, {
+        systemPrompt: `${systemPrompt}\n\n${contextStr}`,
+        maxTokens: 300,
         temperature: 0.5
       });
 
-      return response.choices[0].message.content.trim();
+      return result.text;
 
     } catch (error) {
       console.error('[AIReasoningEngine] Quick reasoning error:', error.message);
@@ -290,20 +275,17 @@ AWARENESS:
         const systemPrompt = this._getModuleSystemPrompt(module, unifiedContext);
         const fullSystemPrompt = `${systemPrompt}\n\n${contextPrompt}`;
 
-        const response = await client.chat.completions.create({
-          model: MODEL,
-          messages: [
-            { role: 'system', content: fullSystemPrompt },
-            { role: 'user', content: query }
-          ],
-          max_tokens: options.maxTokens || 500,
+        const result = await aiProvider.generateText(query, {
+          systemPrompt: fullSystemPrompt,
+          maxTokens: options.maxTokens || 500,
           temperature: options.temperature || 0.5
         });
 
         return {
           module,
           query,
-          response: response.choices[0].message.content.trim(),
+          response: result.text,
+          provider: result.provider,
           success: true
         };
       } catch (error) {

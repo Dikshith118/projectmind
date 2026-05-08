@@ -11,7 +11,7 @@ exports.createProject = async (req, res) => {
   let uploadedFilePath = null;
   
   try {
-    const { name, goal, deadline, hoursPerDay } = req.body;
+    const { name, goal, deadline, hoursPerDay, teamMembers } = req.body;
     if (!name || !goal || !deadline || !hoursPerDay) {
       return res.status(400).json({ error: 'name, goal, deadline, hoursPerDay are required' });
     }
@@ -48,12 +48,26 @@ exports.createProject = async (req, res) => {
       }
     }
 
+    // Parse team members if provided
+    let parsedTeamMembers = [];
+    if (teamMembers) {
+      try {
+        parsedTeamMembers = typeof teamMembers === 'string' 
+          ? JSON.parse(teamMembers) 
+          : teamMembers;
+      } catch (e) {
+        console.error('Failed to parse team members:', e.message);
+      }
+    }
+
     const project = await Project.create({
       user: req.user.userId,
       name,
       goal,
       deadline,
       hoursPerDay,
+      isCollaborative: parsedTeamMembers.length > 0,
+      teamSize: parsedTeamMembers.length + 1
     });
     
     console.log('Calling AI for enhanced task breakdown...');
@@ -140,6 +154,7 @@ exports.createProject = async (req, res) => {
         estimatedH:   t.estimatedH,
         priority:     t.priority,
         dependencies: t.dependencies || [],
+        createdBy:    req.user.userId
       });
       idMap[t.id] = task._id;
       savedTasks.push(task);
@@ -153,6 +168,35 @@ exports.createProject = async (req, res) => {
         paths,
       });
     }
+
+    // Add project owner as member
+    const ProjectMember = require('../models/ProjectMember');
+    await ProjectMember.create({
+      project: project._id,
+      user: req.user.userId,
+      role: 'owner',
+      invitedBy: req.user.userId
+    });
+
+    // Send invitations to team members
+    if (parsedTeamMembers.length > 0) {
+      const teamService = require('../services/teamCollaborationService');
+      
+      for (const member of parsedTeamMembers) {
+        try {
+          await teamService.createInvitation(
+            project._id,
+            member.email,
+            member.role || 'developer',
+            req.user.userId
+          );
+          console.log('Invitation sent to:', member.email);
+        } catch (inviteError) {
+          console.error('Failed to invite', member.email, ':', inviteError.message);
+        }
+      }
+    }
+
     res.status(201).json({
       project,
       tasks:   savedTasks,
@@ -173,7 +217,12 @@ exports.createProject = async (req, res) => {
 
 exports.getProjects = async (req, res) => {
   try {
-    const projects = await Project.find({ user: req.user.userId }).sort('-createdAt');
+    const teamService = require('../services/teamCollaborationService');
+    const projects = await teamService.getUserProjects(req.user.userId);
+    
+    // Sort by creation date
+    projects.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    
     res.json(projects);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -185,12 +234,20 @@ exports.getProject = async (req, res) => {
     const project = await Project.findById(req.params.id);
     if (!project) return res.status(404).json({ error: 'Project not found' });
     
-    // Verify ownership
-    if (project.user.toString() !== req.user.userId) {
+    // Verify access (owner or team member)
+    const teamService = require('../services/teamCollaborationService');
+    const hasAccess = await teamService.hasAccess(req.params.id, req.user.userId);
+    
+    if (!hasAccess) {
       return res.status(403).json({ error: 'Unauthorized' });
     }
     
-    const tasks = await Task.find({ project: project._id }).sort('day');
+    const tasks = await Task.find({ project: project._id })
+      .populate('assignedTo', 'name email')
+      .populate('createdBy', 'name email')
+      .populate('completedBy', 'name email')
+      .sort('day');
+    
     res.json({ project, tasks });
   } catch (err) {
     res.status(500).json({ error: err.message });

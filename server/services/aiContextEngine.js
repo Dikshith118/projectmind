@@ -61,9 +61,9 @@ class AIContextEngine {
         metadata: {
           contextBuiltAt: new Date(),
           projectId,
-          includesActivity,
-          includesProductivity,
-          includesTaskCorrelation
+          includeActivity,
+          includeProductivity,
+          includeTaskCorrelation
         }
       };
 

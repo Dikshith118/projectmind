@@ -11,6 +11,9 @@ require('./models/Project');
 require('./models/Task');
 require('./models/ActivityLog');
 require('./models/TaskMapping');
+require('./models/ProjectMember');
+require('./models/TeamInvitation');
+require('./models/TaskActivity');
 
 const app  = express();
 const server = http.createServer(app);
@@ -27,7 +30,10 @@ app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }));
 app.use(express.json());
 
 // Make io accessible in routes
-app.set('io', io);
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
 
 // Initialize realtime event broadcaster
 const realtimeEventBroadcaster = require('./services/realtimeEventBroadcaster');
@@ -142,8 +148,10 @@ app.use('/api/projects', require('./routes/projects'));
 app.use('/api/activity', require('./routes/activity'));
 app.use('/api/copilot', require('./routes/copilot'));
 app.use('/api/ai', require('./routes/aiFeatures'));
-app.use('/api/explain', require('./routes/explainableAI'));
+app.use('/api/ai', require('./routes/aiProvider'));
 app.use('/api/github', require('./routes/github'));
+app.use('/api/tasks', require('./routes/taskExecution'));
+app.use('/api/team', require('./routes/team'));
 
 // Health check
 app.get('/health', (req, res) => {
@@ -157,8 +165,13 @@ app.get('/health', (req, res) => {
 
 mongoose
   .connect(process.env.MONGODB_URI)
-  .then(() => {
+  .then(async () => {
     console.log('MongoDB connected');
+    
+    // Initialize AI Provider system
+    const aiProvider = require('./services/aiProvider');
+    await aiProvider.initialize();
+    
     server.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`);
       console.log('Socket.IO ready for real-time updates');

@@ -1,64 +1,78 @@
-const Groq   = require('groq-sdk');
-const Project = require('../models/Project');
-const Task    = require('../models/Task');
-const ActivityLog = require('../models/ActivityLog');
+const aiReasoningEngine = require('../services/aiReasoningEngine');
 
-const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
+/**
+ * COPILOT CONTROLLER
+ * 
+ * Uses the unified AI reasoning engine for consistent, context-aware responses
+ */
 
 exports.chat = async (req, res) => {
   try {
     const { projectId, message } = req.body;
 
-    const project  = await Project.findById(projectId);
-    const tasks    = await Task.find({ project: projectId }).sort('day');
-    const recentActivity = await ActivityLog.find({ project: projectId })
-      .sort('-timestamp').limit(20);
+    if (!projectId || !message) {
+      return res.status(400).json({ error: 'projectId and message are required' });
+    }
 
-    const doneTasks    = tasks.filter(t => t.status === 'done').length;
-    const partialTasks = tasks.filter(t => t.status === 'partial').length;
-    const totalTasks   = tasks.length;
-    const completionPct = Math.round((doneTasks / totalTasks) * 100);
+    // Use unified AI reasoning engine
+    const result = await aiReasoningEngine.reason(
+      projectId,
+      'copilot',
+      message,
+      {
+        maxTokens: 300,
+        temperature: 0.5
+      }
+    );
 
-    const recentFiles = [...new Set(
-      recentActivity.map(a => a.file.split(/[\\/]/).pop())
-    )].slice(0, 5).join(', ');
-
-    const systemPrompt = `You are ProjectMind, an AI project copilot.
-
-PROJECT CONTEXT:
-- Name: ${project.name}
-- Goal: ${project.goal}
-- Deadline: ${new Date(project.deadline).toDateString()}
-- Status: ${project.status}
-- Days behind: ${project.daysBehind}
-- Completion: ${completionPct}%
-- Tasks: ${doneTasks} done, ${partialTasks} partial, ${totalTasks - doneTasks - partialTasks} pending
-
-RECENT FILES WORKED ON: ${recentFiles || 'none'}
-
-CURRENT TASKS:
-${tasks.slice(0, 10).map(t =>
-  `- Day ${t.day}: ${t.title} [${t.status}] (${t.priority} priority)`
-).join('\n')}
-
-Answer the user's question specifically using this data.
-Be concise — 2-3 sentences max.
-Reference actual task names and real numbers.
-Never give generic advice.`;
-
-    const response = await client.chat.completions.create({
-      model:    'llama-3.3-70b-versatile',
-      messages: [
-        { role: 'system',  content: systemPrompt },
-        { role: 'user',    content: message },
-      ],
-      max_tokens: 200,
+    res.json({ 
+      reply: result.response,
+      contextAware: true,
+      timestamp: result.timestamp
     });
 
-    res.json({ reply: response.choices[0].message.content.trim() });
+  } catch (err) {
+    console.error('[Copilot] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * Get quick suggestions based on current context
+ */
+exports.getQuickSuggestions = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+
+    // Batch reasoning for multiple suggestions
+    const queries = [
+      { 
+        module: 'copilot', 
+        query: 'What should I focus on right now? One sentence.',
+        options: { maxTokens: 100 }
+      },
+      { 
+        module: 'copilot', 
+        query: 'What is my biggest risk? One sentence.',
+        options: { maxTokens: 100 }
+      },
+      { 
+        module: 'copilot', 
+        query: 'How is my productivity? One sentence.',
+        options: { maxTokens: 100 }
+      }
+    ];
+
+    const results = await aiReasoningEngine.batchReason(projectId, queries);
+
+    const suggestions = results
+      .filter(r => r.success)
+      .map(r => r.response);
+
+    res.json({ suggestions });
 
   } catch (err) {
-    console.error('COPILOT ERROR:', err.message);
+    console.error('[Copilot] Quick suggestions error:', err.message);
     res.status(500).json({ error: err.message });
   }
 };

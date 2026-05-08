@@ -26,7 +26,7 @@ import LiveActivityFeed from '../components/LiveActivityFeed';
 import RealtimeNotifications from '../components/RealtimeNotifications';
 import LiveProductivityPulse from '../components/LiveProductivityPulse';
 import ConnectionStatus from '../components/ConnectionStatus';
-import AIExplanationsDashboard from '../components/AIExplanationsDashboard';
+import IntelligentTaskWorkspace from '../components/IntelligentTaskWorkspace';
 
 export default function Dashboard() {
   const { id } = useParams();
@@ -40,6 +40,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('tasks');
   const [activeFeature, setActiveFeature] = useState(null);
   const [allProjects, setAllProjects] = useState([]);
+  const [selectedTask, setSelectedTask] = useState(null); // For Intelligent Task Workspace
   
   // Demo Generator State
   const [demoData, setDemoData] = useState(null);
@@ -289,13 +290,7 @@ ${demoData.demoScript?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
       icon: '📊',
       title: 'Activity Intelligence',
       desc: 'AI-powered productivity analytics and insights.',
-    },
-    {
-      id: 'explanations',
-      icon: '🧠',
-      title: 'AI Reasoning & Explanations',
-      desc: 'Transparent AI decisions with detailed reasoning.',
-    },
+    }
   ];
 
   if (loading) {
@@ -387,7 +382,6 @@ ${demoData.demoScript?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
                   {activeFeature === 'focus' && '🌙 Deep Focus Mode'}
                   {activeFeature === 'meeting' && '🤝 AI Meeting Assistant'}
                   {activeFeature === 'analytics' && '📊 Activity Intelligence'}
-                  {activeFeature === 'explanations' && '🧠 AI Reasoning & Explanations'}
                 </h2>
               </div>
 
@@ -633,12 +627,6 @@ ${demoData.demoScript?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
                 </div>
               </div>
             )}
-
-            {activeFeature === 'explanations' && (
-              <div className="max-w-5xl">
-                <AIExplanationsDashboard projectId={id} />
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -834,6 +822,7 @@ ${demoData.demoScript?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
                   {filteredTasks.map((task) => (
                     <div
                       key={task._id}
+                      onClick={() => setSelectedTask(task)}
                       className="flex items-center gap-4 px-6 py-4 hover:bg-white/5 transition cursor-pointer hover:scale-[1.01] hover:shadow-lg hover:shadow-violet-900/20"
                     >
                       <span className="text-xl">{statusIcon(task.status)}</span>
@@ -880,6 +869,15 @@ ${demoData.demoScript?.map((s, i) => `${i + 1}. ${s}`).join('\n')}
           </aside>
         </div>
       </main>
+
+      {/* Intelligent Task Workspace */}
+      {selectedTask && (
+        <IntelligentTaskWorkspace
+          task={selectedTask}
+          onClose={() => setSelectedTask(null)}
+          onTaskUpdate={fetchAll}
+        />
+      )}
     </div>
   );
 }

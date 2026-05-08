@@ -10,6 +10,7 @@ let editTimers  = {};
 function start(context) {
   // Track file saves
   const onSave = vscode.workspace.onDidSaveTextDocument(doc => {
+    console.log('[PROJECTMIND] FILE SAVED:', doc.fileName);
     push({ file: doc.fileName, event: 'save', duration: 0 });
   });
 
@@ -18,6 +19,7 @@ function start(context) {
     const file = e.document.fileName;
     if (editTimers[file]) clearTimeout(editTimers[file]);
     editTimers[file] = setTimeout(() => {
+      console.log('[PROJECTMIND] FILE EDITED:', file);
       push({ file, event: 'edit', duration: 30 });
       delete editTimers[file];
     }, 2000);
@@ -26,6 +28,7 @@ function start(context) {
   // Track file opens
   const onOpen = vscode.workspace.onDidOpenTextDocument(doc => {
     if (doc.uri.scheme === 'file') {
+      console.log('[PROJECTMIND] FILE OPENED:', doc.fileName);
       push({ file: doc.fileName, event: 'open', duration: 0 });
     }
   });
@@ -36,7 +39,7 @@ function start(context) {
   // Flush activity to backend every 60 seconds
   interval = setInterval(flush, 60_000);
 
-  console.log('ProjectMind tracker started');
+  console.log('[PROJECTMIND] Tracker started - listening for file activity');
 }
 
 function push(event) {
@@ -45,29 +48,47 @@ function push(event) {
   const token     = cfg.get('token');
 
   // Skip if not configured
-  if (!projectId || !token) return;
+  if (!projectId || !token) {
+    console.log('[PROJECTMIND] ⚠️ Not configured - skipping activity. Missing projectId or token');
+    return;
+  }
 
   // Skip non-file URIs and node_modules
-  if (event.file.includes('node_modules')) return;
-  if (event.file.includes('.git'))         return;
+  if (event.file.includes('node_modules')) {
+    console.log('[PROJECTMIND] Skipping node_modules:', event.file);
+    return;
+  }
+  if (event.file.includes('.git')) {
+    console.log('[PROJECTMIND] Skipping .git:', event.file);
+    return;
+  }
 
   queue.push({ ...event, timestamp: new Date().toISOString() });
-  console.log(`[PM] Queued: ${event.event} — ${event.file.split(/[\\/]/).pop()}`);
+  console.log(`[PROJECTMIND] ✓ Queued: ${event.event} — ${event.file.split(/[\\/]/).pop()} (Queue size: ${queue.length})`);
 }
 
 async function flush() {
-  if (!queue.length) return;
+  if (!queue.length) {
+    console.log('[PROJECTMIND] Flush: Queue is empty, nothing to send');
+    return;
+  }
 
   const cfg       = vscode.workspace.getConfiguration('projectmind');
   const projectId = cfg.get('projectId');
   const token     = cfg.get('token');
   const apiUrl    = cfg.get('apiUrl') || 'http://localhost:4000';
 
-  if (!projectId || !token) return;
+  if (!projectId || !token) {
+    console.log('[PROJECTMIND] ⚠️ Flush skipped: Missing projectId or token');
+    return;
+  }
 
   const batch = queue.splice(0); // drain queue atomically
   const body  = JSON.stringify({ projectId, token, events: batch });
-  const url   = `${apiUrl}/api/activity`;
+  const url   = `${apiUrl}/api/activity/`;
+
+  console.log(`[PROJECTMIND] 🚀 SENDING ${batch.length} events to ${url}`);
+  console.log(`[PROJECTMIND] Request body:`, JSON.stringify({ projectId, eventCount: batch.length, events: batch.map(e => ({ event: e.event, file: e.file.split(/[\\/]/).pop() })) }, null, 2));
 
   try {
     const lib = url.startsWith('https') ? https : http;
@@ -86,8 +107,19 @@ async function flush() {
           },
         },
         (res) => {
-          console.log(`[PM] Flushed ${batch.length} events — status ${res.statusCode}`);
-          resolve(res);
+          let data = '';
+          res.on('data', chunk => data += chunk);
+          res.on('end', () => {
+            console.log(`[PROJECTMIND] ✅ Response received - Status: ${res.statusCode}`);
+            console.log(`[PROJECTMIND] Response body:`, data || '(empty)');
+            
+            if (res.statusCode === 200 || res.statusCode === 201) {
+              console.log(`[PROJECTMIND] 🎉 Successfully sent ${batch.length} events!`);
+            } else {
+              console.error(`[PROJECTMIND] ⚠️ Unexpected status code: ${res.statusCode}`);
+            }
+            resolve(res);
+          });
         }
       );
       req.on('error', reject);
@@ -96,9 +128,12 @@ async function flush() {
     });
   } catch (err) {
     // Put events back in queue if network failed
-    console.error('[PM] Flush failed, re-queuing:', err.message);
+    console.error(`[PROJECTMIND] ❌ Flush failed: ${err.message}`);
+    console.error(`[PROJECTMIND] Error details:`, err);
     queue.unshift(...batch);
   }
+
+  console.log(`[PROJECTMIND] Flush complete. Queue size: ${queue.length}`);
 }
 
 function stop() {
